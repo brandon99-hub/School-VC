@@ -1,0 +1,43 @@
+# --- Python artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Django & project outputs ---
+backend/db.sqlite3
+backend/staticfiles/
+backend/static/
+backend/media/
+backend/*.log
+
+# --- Coverage & testing ---
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# --- Build / cache directories ---
+dist/
+build/
+
+# --- Editor & tooling ---
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+
+# --- Node related (frontend copy tracked separately) ---
+school-management-frontend/node_modules/
+school-management-frontend/.cache/
+
+# --- Environment files ---
+.env
+.env.*
+
