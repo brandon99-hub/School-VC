@@ -36,9 +36,16 @@ class AttendanceSerializer(serializers.ModelSerializer):
         extra_fields = ['course_name', 'course_code']
 
 class AssignmentSerializer(serializers.ModelSerializer):
+    submission_count = serializers.SerializerMethodField()
+    
     class Meta:
         model = Assignment
         fields = '__all__'
+    
+    def get_submission_count(self, obj):
+        """Get the number of submissions for this assignment"""
+        return obj.submissions.count()
+
 
 
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
@@ -73,6 +80,13 @@ class QuizResponseSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuizResponse
         fields = '__all__'
+
+
+class QuizQuestionSerializer(serializers.ModelSerializer):
+    """Serializer for quiz questions"""
+    class Meta:
+        model = QuizQuestion
+        fields = ['id', 'quiz', 'prompt', 'question_type', 'choices', 'correct_answer', 'points', 'order']
 
 
 class QuizSerializer(serializers.ModelSerializer):
@@ -137,15 +151,18 @@ class CourseSerializer(serializers.ModelSerializer):
     enrolled_students = serializers.PrimaryKeyRelatedField(
         many=True, queryset=Student.objects.all(), source='students'
     )
+    enrolled_students_count = serializers.IntegerField(source='students.count', read_only=True)
     teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
 
     class Meta:
         model = Course
         fields = '__all__'
+        extra_fields = ['enrolled_students_count', 'teacher_name']
 
 
 class CourseDetailSerializer(CourseSerializer):
     modules = ModuleSerializer(many=True, read_only=True)
+    assignments = AssignmentSerializer(many=True, read_only=True, source='assignment_set')
     discussion_threads = serializers.SerializerMethodField()
     assignment_submissions = serializers.SerializerMethodField()
     quiz_submissions = serializers.SerializerMethodField()

@@ -52,4 +52,10 @@ urlpatterns = [
     # API endpoints for AJAX requests
     path('api/schedule/check-conflict/', views.check_schedule_conflict, name='check_schedule_conflict'),
     path('api/enrollment/status/', views.check_enrollment_status, name='check_enrollment_status'),
+    
+    # New API endpoints for teacher dashboard
+    path('api/<int:pk>/students/', views.course_students_api, name='course_students_api'),
+    path('api/grades/', views.submit_grade_api, name='submit_grade_api'),
+    path('api/<int:pk>/gradebook/', views.course_gradebook_api, name='course_gradebook_api'),
+    path('api/grades/<int:grade_id>/', views.update_grade_api, name='update_grade_api'),
 ] + router.urls

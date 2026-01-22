@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q
 from .models import Student, Attendance
-from courses.models import Course, Attendance as CourseAttendance
+from courses.models import Assignment, Course, Grade, Attendance as CourseAttendance
 from courses.serializers import CourseSerializer, AttendanceSerializer as CourseAttendanceSerializer
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
@@ -381,4 +381,123 @@ def get_attendance_status(request):
         'message': 'Invalid request method'
     }, status=400)
 
-# Create your views here.
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_attendance_api(request):
+    """Mark attendance for a student (REST API endpoint)"""
+    student_id = request.data.get('student')
+    date = request.data.get('date')
+    status_value = request.data.get('status')
+    
+    if not all([student_id, date, status_value]):
+        return Response({'error': 'Missing required fields'}, status=400)
+    
+    try:
+        student = Student.objects.get(pk=student_id)
+    except Student.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=404)
+    
+    # Check permission (teacher or admin)
+    if not (request.user.is_superuser or hasattr(request.user, 'teacher')):
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    attendance, created = CourseAttendance.objects.update_or_create(
+        student=student,
+        date=date,
+        defaults={'status': status_value}
+    )
+    
+    return Response({
+        'success': True,
+        'attendance_id': attendance.id,
+        'created': created
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_my_attendance(request):
+    """Student marks their own attendance for today"""
+    from datetime import date
+    
+    course_id = request.data.get('course_id')
+    
+    if not course_id:
+        return Response({'error': 'Course ID required'}, status=400)
+    
+    # Verify student is enrolled
+    try:
+        course = Course.objects.get(pk=course_id)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
+    
+    # Check if user is a student and enrolled
+    if request.user not in course.students.all():
+        return Response({'error': 'Not enrolled in this course'}, status=403)
+    
+    today = date.today()
+    
+    # Check if already marked
+    existing = CourseAttendance.objects.filter(
+        student=request.user,
+        course=course,
+        date=today
+    ).first()
+    
+    if existing:
+        return Response({
+            'error': 'Attendance already marked for today',
+            'attendance': {
+                'id': existing.id,
+                'status': existing.status,
+                'date': existing.date
+            }
+        }, status=400)
+    
+    # Create attendance record
+    attendance = CourseAttendance.objects.create(
+        student=request.user,
+        course=course,
+        date=today,
+        status='present'
+    )
+    
+    return Response({
+        'success': True,
+        'message': 'Attendance marked successfully',
+        'attendance': {
+            'id': attendance.id,
+            'date': attendance.date,
+            'status': attendance.status
+        }
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_attendance_status(request, course_id):
+    """Check if student has marked attendance for today"""
+    from datetime import date
+    
+    try:
+        course = Course.objects.get(pk=course_id)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
+    
+    if request.user not in course.students.all():
+        return Response({'error': 'Not enrolled in this course'}, status=403)
+    
+    today = date.today()
+    attendance = CourseAttendance.objects.filter(
+        student=request.user,
+        course=course,
+        date=today
+    ).first()
+    
+    return Response({
+        'marked': attendance is not None,
+        'attendance': {
+            'id': attendance.id,
+            'status': attendance.status,
+            'date': attendance.date
+        } if attendance else None
+    })

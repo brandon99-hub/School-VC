@@ -20,6 +20,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .permissions import IsAdmin
 from .serializers import UserSerializer, TeacherSerializer, AnnouncementSerializer, NotificationSerializer, \
     StudentSerializer, UserRegistrationSerializer, DynamicUserRegistrationSerializer  # Updated serializer names
+from .utils import get_user_role
 from rest_framework import generics
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -48,10 +49,9 @@ class UserView(APIView):
 
     def get(self, request):
         user_data = UserSerializer(request.user).data
+        user_data['role'] = get_user_role(request.user)
         if hasattr(request.user, 'teacher'):
-            user_data['role'] = 'teacher'
-        else:
-            user_data['role'] = 'student'
+            user_data['teacher_profile'] = TeacherSerializer(request.user.teacher).data
         return Response(user_data)
 
 
@@ -65,7 +65,7 @@ class ProfileView(APIView):
 
     def get(self, request):
         data = UserSerializer(request.user).data
-        data['role'] = 'teacher' if hasattr(request.user, 'teacher') else 'student'
+        data['role'] = get_user_role(request.user)
         if hasattr(request.user, 'teacher'):
             data['teacher_profile'] = TeacherSerializer(request.user.teacher).data
         return Response(data)
@@ -83,7 +83,7 @@ class ProfileView(APIView):
             teacher_serializer.save()
 
         response_data = serializer.data
-        response_data['role'] = 'teacher' if teacher else 'student'
+        response_data['role'] = get_user_role(request.user)
         if teacher:
             response_data['teacher_profile'] = TeacherSerializer(teacher).data
         return Response(response_data)
@@ -106,13 +106,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         logger.debug(f"Authenticated user: {user}")
         data = super().validate(attrs)
-        # Serialize using the StudentSerializer (or a custom one)
-        serialized_user = StudentSerializer(user).data
-        # Inject the role explicitly based on whether the user has a teacher relation
-        if hasattr(user, 'teacher'):
-            serialized_user['role'] = 'teacher'
-        else:
-            serialized_user['role'] = 'student'
+        # Serialize using the UserSerializer
+        serialized_user = UserSerializer(user).data
+        
+        # Proper RBAC: Check role using utility function
+        serialized_user['role'] = get_user_role(user)
+            
         data['user'] = serialized_user
         return data
 
@@ -287,3 +286,75 @@ class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()  # Updated to Student
     serializer_class = StudentSerializer  # Updated to StudentSerializer
     permission_classes = [IsAdmin]
+
+
+from rest_framework.decorators import api_view, permission_classes
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_stats(request):
+    """Get dashboard statistics for admin"""
+    if not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    stats = {
+        'totalCourses': Course.objects.count(),
+        'activeCourses': Course.objects.filter(is_active=True).count(),
+        'totalTeachers': Teacher.objects.count(),
+        'totalStudents': Student.objects.count(),
+    }
+    
+    return Response(stats)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_users(request):
+    """List all users (teachers and students) for admin management"""
+    if not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    # AUTH_USER_MODEL is students.Student, so Student objects ARE the base users.
+    # Teacher has a OneToOneField named 'user' pointing to AUTH_USER_MODEL (Student).
+    teachers = Teacher.objects.all().select_related('user')
+    
+    # We query all students, but we'll categorize them.
+    # We don't use select_related('user') because Student IS the user model.
+    all_base_users = Student.objects.all()
+    
+    data = []
+    processed_user_ids = set()
+    
+    # Process Teachers first to ensure they get the correct role
+    for teacher in teachers:
+        processed_user_ids.add(teacher.user.id)
+        data.append({
+            'id': f"teacher_{teacher.id}",
+            'db_id': teacher.id,
+            'name': f"{teacher.user.first_name} {teacher.user.last_name}".strip() or teacher.user.email,
+            'email': teacher.user.email,
+            'role': 'teacher',
+            'username': teacher.user.username,
+            'date_joined': teacher.date_joined,
+            'is_active': teacher.user.is_active
+        })
+        
+    # Process remaining users
+    for user in all_base_users:
+        if user.id in processed_user_ids:
+            continue
+            
+        role = 'student'
+        if user.is_superuser:
+            role = 'admin'
+        
+        data.append({
+            'id': f"{role}_{user.id}",
+            'db_id': user.id,
+            'name': f"{user.first_name} {user.last_name}".strip() or user.email,
+            'email': user.email,
+            'role': role,
+            'username': user.username,
+            'date_joined': user.date_joined,
+            'is_active': user.is_active
+        })
+            
+    return Response(data)

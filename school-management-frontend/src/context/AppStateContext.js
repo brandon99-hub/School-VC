@@ -10,12 +10,16 @@ const appReducer = (state, action) => {
             return { ...state, teacherAttendance: action.payload };
         case 'SET_STUDENT_ATTENDANCE':
             return { ...state, studentAttendance: action.payload };
+        case 'SET_UNIQUE_STUDENT_COUNT':
+            return { ...state, uniqueStudentCount: action.payload };
         case 'SET_LOADING':
             return { ...state, loading: action.payload };
-        case 'SET_ERROR':
-            return { ...state, error: action.payload };
+        case 'SET_TOAST':
+            return { ...state, toast: action.payload };
+        case 'CLEAR_TOAST':
+            return { ...state, toast: null };
         case 'CLEAR_STATE':
-            return { courses: [], teacherAttendance: [], studentAttendance: [], loading: false, error: null };
+            return { courses: [], teacherAttendance: [], studentAttendance: [], uniqueStudentCount: 0, loading: false, error: null, toast: null };
         default:
             return state;
     }
@@ -26,8 +30,10 @@ export const AppStateProvider = ({ children }) => {
         courses: [],
         teacherAttendance: [],
         studentAttendance: [],
+        uniqueStudentCount: 0,
         loading: false,
         error: null,
+        toast: null,
     });
 
     const [needsRefresh, setNeedsRefresh] = useState(true);
@@ -36,8 +42,15 @@ export const AppStateProvider = ({ children }) => {
         setNeedsRefresh(true);
     };
 
+    const showToast = (message, type = 'success') => {
+        dispatch({ type: 'SET_TOAST', payload: { message, type } });
+        setTimeout(() => {
+            dispatch({ type: 'CLEAR_TOAST' });
+        }, 3000);
+    };
+
     const value = useMemo(
-        () => ({ ...state, dispatch, refresh, needsRefresh, setNeedsRefresh }),
+        () => ({ ...state, dispatch, refresh, needsRefresh, setNeedsRefresh, showToast }),
         [state, needsRefresh]
     );
 

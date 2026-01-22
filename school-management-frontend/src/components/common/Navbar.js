@@ -95,7 +95,7 @@ const Navbar = () => {
         };
     }, [user, get]);
 
-    if (['/login', '/signup'].includes(location.pathname)) {
+    if (['/login', '/signup'].includes(location.pathname) || location.pathname.startsWith('/admin')) {
         return null;
     }
 
@@ -135,11 +135,10 @@ const Navbar = () => {
                                 <Link
                                     key={link.to}
                                     to={link.to}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                        location.pathname === link.to
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === link.to
                                             ? 'bg-indigo-50 text-indigo-700'
                                             : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                                    }`}
+                                        }`}
                                 >
                                     {link.label}
                                 </Link>
@@ -281,9 +280,8 @@ const Navbar = () => {
                                 <button
                                     key={link.to}
                                     onClick={() => handleNavigate(link.to)}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium ${
-                                        location.pathname === link.to ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
+                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium ${location.pathname === link.to ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
                                 >
                                     {link.label}
                                 </button>

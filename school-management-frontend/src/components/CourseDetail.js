@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
+import { generateAssignmentPDF } from '../utils/pdfGenerator';
+import AssignmentSubmission from './student/AssignmentSubmission';
+import AttendanceMarker from './student/AttendanceMarker';
+import QuizTaker from './student/QuizTaker';
+import CollapsibleSection from './CollapsibleSection';
 import {
     ResponsiveContainer,
     RadialBarChart,
@@ -43,6 +48,8 @@ const CourseDetail = () => {
     const [expandedLesson, setExpandedLesson] = useState(null);
     const [submissionView, setSubmissionView] = useState('chart');
     const [activeSection, setActiveSection] = useState('overview');
+    const [submittingAssignment, setSubmittingAssignment] = useState(null);
+    const [takingQuiz, setTakingQuiz] = useState(null);
 
     const learningSummary = useMemo(() => course?.learning_summary || {}, [course]);
     const studentProgress = useMemo(() => course?.student_progress || {}, [course]);
@@ -183,9 +190,8 @@ const CourseDetail = () => {
                         <button
                             key={section.id}
                             onClick={() => handleSectionClick(section.id)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                                activeSection === section.id ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'
-                            }`}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition ${activeSection === section.id ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:bg-gray-100'
+                                }`}
                         >
                             {section.label}
                         </button>
@@ -210,10 +216,14 @@ const CourseDetail = () => {
                     </div>
                 </section>
 
-                <SectionShell
+                {/* Attendance Marker */}
+                <AttendanceMarker courseId={id} courseName={course.name} />
+
+                <CollapsibleSection
                     id="learning-path"
                     title="Learning Path"
                     description={`${learningSummary.published_lessons || 0} of ${learningSummary.total_lessons || 0} lessons published`}
+                    defaultExpanded={true}
                 >
                     {course.modules?.length ? (
                         <div className="space-y-4">
@@ -281,8 +291,11 @@ const CourseDetail = () => {
                                                                                     {quiz.questions.length} questions · {quiz.time_limit_minutes} mins
                                                                                 </p>
                                                                             </div>
-                                                                            <button className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
-                                                                                Review
+                                                                            <button
+                                                                                onClick={() => setTakingQuiz(quiz)}
+                                                                                className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700"
+                                                                            >
+                                                                                Take Quiz
                                                                             </button>
                                                                         </div>
                                                                     ))}
@@ -300,15 +313,15 @@ const CourseDetail = () => {
                     ) : (
                         <p className="text-gray-500">No modules published yet.</p>
                     )}
-                </SectionShell>
+                </CollapsibleSection>
 
-                <SectionShell id="assignments" title="Assignments" description="All coursework with deadlines and marks.">
+                <CollapsibleSection id="assignments" title="Assignments" description="All coursework with deadlines and marks." defaultExpanded={true}>
                     {course.assignments?.length ? (
                         <div className="space-y-4">
                             {course.assignments.map((assignment) => (
                                 <div key={assignment.id} className="border border-gray-100 rounded-xl p-4 hover:border-indigo-200 transition">
                                     <div className="flex items-start justify-between gap-4">
-                                        <div>
+                                        <div className="flex-1">
                                             <p className="text-xs uppercase text-gray-400">Assignment</p>
                                             <h3 className="text-lg font-semibold text-gray-900">{assignment.title}</h3>
                                             <p className="text-sm text-gray-600 mt-1">{assignment.description}</p>
@@ -323,16 +336,21 @@ const CourseDetail = () => {
                                                 </span>
                                             </div>
                                         </div>
-                                        {assignment.file && (
-                                            <a
-                                                href={assignment.file}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-indigo-600 hover:text-indigo-800"
+                                        <div className="flex flex-col gap-2">
+                                            <button
+                                                onClick={() => generateAssignmentPDF(assignment)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap"
                                             >
                                                 <i className="fas fa-download" />
-                                            </a>
-                                        )}
+                                                Download PDF
+                                            </button>
+                                            <button
+                                                onClick={() => setSubmittingAssignment(assignment)}
+                                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 whitespace-nowrap"
+                                            >
+                                                Submit Work
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -340,18 +358,17 @@ const CourseDetail = () => {
                     ) : (
                         <p className="text-gray-500">No assignments available.</p>
                     )}
-                </SectionShell>
+                </CollapsibleSection>
 
                 {course.student_submissions && (
-                    <SectionShell id="submissions" title="Your Submissions" description="Toggle between charts and tables.">
+                    <CollapsibleSection id="submissions" title="Your Submissions" description="Toggle between charts and tables.">
                         <div className="flex flex-wrap items-center gap-3 mb-4">
                             <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
                                 {['chart', 'table'].map((option) => (
                                     <button
                                         key={option}
-                                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
-                                            submissionView === option ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'
-                                        }`}
+                                        className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${submissionView === option ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                                            }`}
                                         onClick={() => setSubmissionView(option)}
                                     >
                                         {option === 'chart' ? 'Chart' : 'Table'}
@@ -417,7 +434,7 @@ const CourseDetail = () => {
                                 </div>
                             </div>
                         )}
-                    </SectionShell>
+                    </CollapsibleSection>
                 )}
 
                 <SectionShell id="discussions" title="Discussion Board" description="Highlights from the class forum.">
@@ -500,6 +517,30 @@ const CourseDetail = () => {
                     )}
                 </SectionShell>
             </main>
+
+            {/* Assignment Submission Modal */}
+            {submittingAssignment && (
+                <AssignmentSubmission
+                    assignment={submittingAssignment}
+                    onClose={() => setSubmittingAssignment(null)}
+                    onSubmit={() => {
+                        // Refresh course data after submission
+                        window.location.reload();
+                    }}
+                />
+            )}
+
+            {/* Quiz Taker Modal */}
+            {takingQuiz && (
+                <QuizTaker
+                    quiz={takingQuiz}
+                    onClose={() => setTakingQuiz(null)}
+                    onComplete={() => {
+                        // Refresh course data after quiz completion
+                        window.location.reload();
+                    }}
+                />
+            )}
         </div>
     );
 };

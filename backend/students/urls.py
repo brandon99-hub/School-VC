@@ -25,4 +25,8 @@ urlpatterns = [
     # API endpoints for AJAX requests
     path('api/attendance/mark/', views.mark_attendance, name='mark_attendance'),
     path('api/attendance/status/', views.get_attendance_status, name='attendance_status'),
+    path('api/attendance/', views.submit_attendance_api, name='submit_attendance_api'),
+    path('api/mark-attendance/', views.mark_my_attendance, name='mark_my_attendance'),
+    path('api/attendance-status/<int:course_id>/', views.check_attendance_status, name='check_attendance_status'),
+    path('enroll/', views.enroll_course, name='enroll_course'),
 ]

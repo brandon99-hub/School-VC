@@ -16,6 +16,10 @@ import ProfilePage from './components/ProfilePage';
 import CourseList from './components/CourseList';
 import AttendanceRecord from './components/AttendanceRecord';
 import TeacherAttendanceRecord from './components/TeacherAttendanceRecord';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import TeacherCourseList from './pages/teacher/TeacherCourseList';
+import TeacherCourseView from './pages/teacher/TeacherCourseView';
+import ToastContainer from './components/common/ToastContainer';
 
 function App() {
     const { isAuthenticated, loading: authLoading, user } = useAuth();
@@ -32,12 +36,13 @@ function App() {
 
         try {
             if (user.role === 'teacher') {
-                const [attendanceData, coursesData] = await Promise.all([
-                    get(`/teachers/${user.id}/class-attendance/`),
+                const [attendanceData, coursesResponse] = await Promise.all([
+                    get(`/teachers/api/class-attendance/`),
                     get(`/teachers/api/courses/`),
                 ]);
                 dispatch({ type: 'SET_TEACHER_ATTENDANCE', payload: attendanceData || [] });
-                dispatch({ type: 'SET_COURSES', payload: coursesData || [] });
+                dispatch({ type: 'SET_COURSES', payload: coursesResponse?.courses || [] });
+                dispatch({ type: 'SET_UNIQUE_STUDENT_COUNT', payload: coursesResponse?.unique_student_count || 0 });
             } else if (user.role === 'student') {
                 const [attendanceData, enrolledCourses] = await Promise.all([
                     get(`/students/${user.id}/attendance/`),
@@ -81,18 +86,20 @@ function App() {
                 <Routes>
                     <Route
                         path="/login"
-                        element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />}
+                        element={!isAuthenticated ? <Login /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />}
                     />
                     <Route
                         path="/signup"
-                        element={!isAuthenticated ? <Signup /> : <Navigate to="/dashboard" />}
+                        element={!isAuthenticated ? <Signup /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />}
                     />
                     <Route path="/contact" element={<Contact />} />
                     <Route
                         path="/dashboard"
                         element={
                             isAuthenticated ? (
-                                user?.role === 'teacher' ? (
+                                user?.role === 'admin' ? (
+                                    <Navigate to="/admin" replace />
+                                ) : user?.role === 'teacher' ? (
                                     <TeacherDashboard />
                                 ) : (
                                     <StudentDashboard />
@@ -161,6 +168,36 @@ function App() {
                         }
                     />
                     <Route
+                        path="/admin/*"
+                        element={
+                            isAuthenticated && user?.is_superuser ? (
+                                <AdminDashboard />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/teacher/courses"
+                        element={
+                            isAuthenticated && user?.role === 'teacher' ? (
+                                <TeacherCourseList />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/teacher/courses/:id"
+                        element={
+                            isAuthenticated && user?.role === 'teacher' ? (
+                                <TeacherCourseView />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
                         path="/teacher-attendance"
                         element={
                             isAuthenticated ? (
@@ -176,9 +213,10 @@ function App() {
                     />
                     <Route
                         path="/"
-                        element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
+                        element={<Navigate to={isAuthenticated ? (user?.role === 'admin' ? '/admin/dashboard' : '/dashboard') : '/login'} replace />}
                     />
                 </Routes>
+                <ToastContainer />
             </div>
         </Router>
     );

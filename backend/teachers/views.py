@@ -293,44 +293,63 @@ def assigned_courses_api(request):
 
     courses = request.user.teacher.course_set.all()
     serializer = CourseSerializer(courses, many=True)
-    return Response(serializer.data)
+    
+    # Calculate unique student count across all courses
+    unique_students = Student.objects.filter(
+        enrolled_courses__teacher=request.user.teacher
+    ).distinct().count()
+    
+    return Response({
+        'courses': serializer.data,
+        'unique_student_count': unique_students
+    })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def teacher_class_attendance(request, pk):
+def teacher_class_attendance(request):
     """
-    API endpoint to get class attendance data for a teacher.
-    Returns attendance records for students in the teacher's courses.
+    API endpoint to get class attendance data for authenticated teacher.
+    Returns attendance records aggregated by course and date with attendance rates.
     """
-    try:
-        teacher = Teacher.objects.get(pk=pk)
-    except Teacher.DoesNotExist:
-        return Response({'error': 'Teacher not found'}, status=404)
-
-    # Check if the requesting user is the teacher or an admin
-    if not (request.user.is_superuser or (hasattr(request.user, 'teacher') and request.user.teacher == teacher)):
-        return Response({'error': 'Permission denied'}, status=403)
-
+    # Check if user is a teacher
+    if not hasattr(request.user, 'teacher'):
+        return Response({'error': 'Not a teacher account'}, status=403)
+    
+    teacher = request.user.teacher
+    
     # Get all courses taught by the teacher
     courses = Course.objects.filter(teacher=teacher)
-
-    # Get all students enrolled in these courses
-    students = Student.objects.filter(enrolled_courses__in=courses).distinct()
-
-    # Get attendance records for these students
-    attendance_records = Attendance.objects.filter(student__in=students)
-
-    # Serialize the data
-    attendance_data = [
-        {
-            'student_id': attendance.student.id,
-            'student_name': f"{attendance.student.user.first_name} {attendance.student.user.last_name}",
-            'course_id': attendance.student.enrolled_courses.filter(teacher=teacher).first().id,
-            'course_name': attendance.student.enrolled_courses.filter(teacher=teacher).first().name,
-            'date': attendance.date,
-            'status': attendance.status,
-        }
-        for attendance in attendance_records
-    ]
-
+    
+    # Aggregate attendance by course and date
+    attendance_data = []
+    
+    for course in courses:
+        students = course.enrolled_students.all()
+        
+        # Get unique dates with attendance records for this course's students
+        dates = Attendance.objects.filter(
+            student__in=students
+        ).values_list('date', flat=True).distinct().order_by('-date')
+        
+        for date in dates:
+            # Calculate attendance rate for this course on this date
+            total_students = students.count()
+            if total_students == 0:
+                continue
+            
+            present_count = Attendance.objects.filter(
+                student__in=students,
+                date=date,
+                status='Present'
+            ).count()
+            
+            attendance_rate = round((present_count / total_students) * 100)
+            
+            attendance_data.append({
+                'id': f"{course.id}_{date}",
+                'course': course.name,
+                'date': date.isoformat(),
+                'attendanceRate': attendance_rate
+            })
+    
     return Response(attendance_data)

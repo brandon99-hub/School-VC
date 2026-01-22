@@ -56,7 +56,16 @@ const Login = () => {
             localStorage.setItem('access_token', response.access);
             localStorage.setItem('refresh_token', response.refresh);
             login(response.user, response.access, response.refresh);
-            navigate('/dashboard');
+
+            // RBAC Redirect
+            const { role } = response.user;
+            if (role === 'admin') {
+                navigate('/admin/dashboard');
+            } else if (role === 'teacher') {
+                navigate('/teacher/dashboard');
+            } else {
+                navigate('/dashboard');
+            }
         } catch (err) {
             const message = err.response?.data?.detail || 'Invalid credentials. Please try again.';
             setError(message);
@@ -168,9 +177,8 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className={`w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                                    loading ? 'cursor-not-allowed opacity-70' : ''
-                                }`}
+                                className={`w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${loading ? 'cursor-not-allowed opacity-70' : ''
+                                    }`}
                             >
                                 {loading ? 'Signing in...' : 'Sign in'}
                             </button>

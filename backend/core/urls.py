@@ -2,7 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
-from . import views
+from . import views, admin_views
 from .views import (
     CustomTokenObtainPairView,
     AnnouncementViewSet,
@@ -14,12 +14,13 @@ from .views import (
     CSRFTokenView,
     LogoutView
 )
-from courses.views import CourseViewSet, GradeViewSet
+from courses.views import CourseViewSet, GradeViewSet, AssignmentViewSet
 from students.views import enroll_course
 
 router = DefaultRouter()
 router.register(r'students', views.StudentViewSet)
 router.register(r'courses', CourseViewSet)
+router.register(r'assignments', AssignmentViewSet)
 router.register(r'grades', GradeViewSet)
 router.register(r'teachers', views.TeacherViewSet)
 router.register(r'announcements', views.AnnouncementViewSet)
@@ -56,7 +57,17 @@ urlpatterns = [
         # Router-based endpoints
         path('', include(router.urls)),
 
+        # Sub-app API sub-routes
+        path('teacher/', include('teachers.api_urls')),
+
         # Additional API endpoints
         path('notifications/', NotificationListView.as_view(), name='api_notifications'),
+        
+        # Admin endpoints
+        path('admin/stats/', views.admin_stats, name='admin_stats'),
+        path('admin/users/', views.admin_users, name='admin_users'),
+        path('admin/teachers/', admin_views.admin_teachers, name='admin_teachers'),
+        path('admin/courses/', include('core.admin_urls')),
     ])),
 ]
+

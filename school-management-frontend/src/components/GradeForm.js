@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi';
+import { useAppState } from '../context/AppStateContext';
 
 const GradeForm = ({ assignmentId, onClose }) => {
     const { get, post } = useApi();
+    const { showToast } = useAppState();
     const [students, setStudents] = useState([]);
     const [grades, setGrades] = useState({});
     const [loading, setLoading] = useState(true);
@@ -11,8 +13,8 @@ const GradeForm = ({ assignmentId, onClose }) => {
     useEffect(() => {
         const fetchStudents = async () => {
             try {
-                const assignment = await get(`/assignments/${assignmentId}/`);
-                const data = await get(`/courses/${assignment.course}/students/`);
+                const assignment = await get(`/api/assignments/${assignmentId}/`);
+                const data = await get(`/api/courses/${assignment.course}/students/`);
                 setStudents(data);
                 const initialGrades = {};
                 data.forEach((student) => {
@@ -22,25 +24,32 @@ const GradeForm = ({ assignmentId, onClose }) => {
             } catch (err) {
                 console.error('Error fetching students:', err);
                 setError('Failed to load students. Please try again.');
+                showToast('Failed to load students', 'error');
             } finally {
                 setLoading(false);
             }
         };
         fetchStudents();
-    }, [get, assignmentId]);
+    }, [get, assignmentId, showToast]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             for (const [studentId, score] of Object.entries(grades)) {
                 if (score) {
-                    await post('/grades/', { student: studentId, assignment: assignmentId, score });
+                    await post('/api/courses/grades/', {
+                        student: studentId,
+                        assignment: assignmentId,
+                        score
+                    });
                 }
             }
+            showToast('Grades submitted successfully!');
             onClose();
         } catch (err) {
             console.error('Error submitting grades:', err);
             setError('Failed to submit grades. Please try again.');
+            showToast('Failed to submit grades', 'error');
         }
     };
 

@@ -1,6 +1,8 @@
 # teachers/urls.py
 from django.urls import path
 from . import views
+from . import module_views
+from . import lesson_views
 
 app_name = 'teachers'
 
@@ -19,6 +21,15 @@ urlpatterns = [
     path('schedule/', views.teacher_schedule, name='schedule'),
     path('api/students/attendance/', views.mark_student_attendance, name='mark_student_attendance'),
     path('api/assignments/status/', views.update_assignment_status, name='update_assignment_status'),
-    # New endpoint for class attendance
-    path('<int:pk>/class-attendance/', views.teacher_class_attendance, name='teacher_class_attendance'),
+    # API endpoint for class attendance (uses authenticated user)
+    path('api/class-attendance/', views.teacher_class_attendance, name='teacher_class_attendance'),
+    
+    # Module Management API
+    path('api/courses/<int:course_id>/modules/', module_views.course_modules_list, name='course_modules_list'),
+    path('api/modules/<int:module_id>/', module_views.module_detail, name='module_detail'),
+    path('api/courses/<int:course_id>/modules/reorder/', module_views.reorder_modules, name='reorder_modules'),
+    
+    # Lesson Management API
+    path('api/modules/<int:module_id>/lessons/', lesson_views.module_lessons_list, name='module_lessons_list'),
+    path('api/lessons/<int:lesson_id>/', lesson_views.lesson_detail, name='lesson_detail'),
 ]

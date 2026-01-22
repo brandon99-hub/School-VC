@@ -329,6 +329,20 @@ class CourseViewSet(viewsets.ModelViewSet):
         serializer = StudentSerializer(students, many=True)  # Updated to StudentSerializer
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def assignments(self, request, pk=None):
+        course = self.get_object()
+        assignments = course.assignment_set.all()
+        serializer = AssignmentSerializer(assignments, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def modules(self, request, pk=None):
+        course = self.get_object()
+        modules = course.module_set.all().order_by('order')
+        serializer = ModuleSerializer(modules, many=True)
+        return Response(serializer.data)
+
 
 class ModuleViewSet(viewsets.ModelViewSet):
     queryset = Module.objects.select_related('course')
@@ -403,6 +417,23 @@ class QuizSubmissionViewSet(viewsets.ModelViewSet):
             QuizSubmission.objects.filter(quiz=quiz, student=student).count() + 1
         )
         serializer.save(student=student, attempt_number=attempt_number)
+
+
+class AssignmentViewSet(viewsets.ModelViewSet):
+    queryset = Assignment.objects.all()
+    serializer_class = AssignmentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save()
+
 
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
@@ -532,3 +563,141 @@ def course_detail_api(request, pk):
             {"error": "An unexpected error occurred."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def course_students_api(request, pk):
+    """Get list of students enrolled in a course"""
+    try:
+        course = Course.objects.get(pk=pk)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
+    
+    # Check if user is teacher of this course or admin
+    if not (request.user.is_superuser or 
+            (hasattr(request.user, 'teacher') and course.teacher == request.user.teacher)):
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    students = course.enrolled_students.all()
+    data = [
+        {
+            'id': s.id,
+            'name': f"{s.first_name} {s.last_name}".strip(),
+            'email': s.email,
+            'student_id': s.student_id
+        }
+        for s in students
+    ]
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_grade_api(request):
+    """Submit a grade for a student assignment"""
+    student_id = request.data.get('student')
+    assignment_id = request.data.get('assignment')
+    score = request.data.get('score')
+    
+    if not all([student_id, assignment_id, score]):
+        return Response({'error': 'Missing required fields'}, status=400)
+    
+    try:
+        assignment = Assignment.objects.get(pk=assignment_id)
+        student = Student.objects.get(pk=student_id)
+    except (Assignment.DoesNotExist, Student.DoesNotExist):
+        return Response({'error': 'Invalid assignment or student'}, status=404)
+    
+    # Check permission
+    if not (request.user.is_superuser or 
+            (hasattr(request.user, 'teacher') and assignment.course.teacher == request.user.teacher)):
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    grade, created = Grade.objects.update_or_create(
+        student=student,
+        assignment=assignment,
+        defaults={'score': score}
+    )
+    
+    return Response({
+        'success': True,
+        'grade_id': grade.id,
+        'created': created
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def course_gradebook_api(request, pk):
+    """Get complete gradebook for a course with all students and their grades"""
+    try:
+        course = Course.objects.get(pk=pk)
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found'}, status=404)
+    
+    # Permission check - only teacher of course or admin
+    if not (request.user.is_superuser or 
+            (hasattr(request.user, 'teacher') and course.teacher == request.user.teacher)):
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    students = course.students.all()
+    assignments = course.assignment_set.all().order_by('due_date')
+    
+    gradebook = []
+    for student in students:
+        student_data = {
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'email': student.email,
+            'student_number': student.student_id,
+            'grades': {}
+        }
+        
+        for assignment in assignments:
+            try:
+                grade = Grade.objects.get(student=student, assignment=assignment)
+                student_data['grades'][str(assignment.id)] = {
+                    'score': float(grade.score),
+                    'letter_grade': grade.letter_grade or '',
+                    'grade_id': grade.id
+                }
+            except Grade.DoesNotExist:
+                student_data['grades'][str(assignment.id)] = None
+        
+        gradebook.append(student_data)
+    
+    return Response({
+        'students': gradebook,
+        'assignments': AssignmentSerializer(assignments, many=True).data
+    })
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_grade_api(request, grade_id):
+    """Update an existing grade"""
+    try:
+        grade = Grade.objects.get(pk=grade_id)
+    except Grade.DoesNotExist:
+        return Response({'error': 'Grade not found'}, status=404)
+    
+    # Permission check
+    if not (request.user.is_superuser or 
+            (hasattr(request.user, 'teacher') and grade.course.teacher == request.user.teacher)):
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    score = request.data.get('score')
+    letter_grade = request.data.get('letter_grade', '')
+    
+    if score is not None:
+        grade.score = score
+    if letter_grade:
+        grade.letter_grade = letter_grade
+    
+    grade.save()
+    
+    return Response({
+        'success': True,
+        'grade_id': grade.id,
+        'score': float(grade.score),
+        'letter_grade': grade.letter_grade
+    })
