@@ -25,6 +25,9 @@ urlpatterns = [
     path('students/', include('students.urls')),
     path('teachers/', include('teachers.urls')),
     path('courses/', include('courses.urls')),
+    path('api/cbc/', include('cbc.urls')),  # CBC API endpoints
+    path('api/parents/', include('students.parent_urls')),  # Parent Portal API
+    path('api/finance/', include('finance.urls')),  # Finance API
 ]
 
 if settings.DEBUG:

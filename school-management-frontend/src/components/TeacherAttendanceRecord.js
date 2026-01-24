@@ -74,11 +74,10 @@ const TeacherAttendanceRecord = () => {
                         {['chart', 'table'].map((option) => (
                             <button
                                 key={option}
-                                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                                    view === option
-                                        ? 'bg-white shadow text-blue-600'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
+                                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${view === option
+                                    ? 'bg-white shadow-sm text-[#18216D]'
+                                    : 'text-slate-400 hover:text-slate-600'
+                                    }`}
                                 onClick={() => setView(option)}
                             >
                                 {option === 'chart' ? 'Chart' : 'Table'}
@@ -106,7 +105,7 @@ const TeacherAttendanceRecord = () => {
                                 <YAxis stroke="#94a3b8" unit="%" domain={[0, 100]} />
                                 <Tooltip />
                                 <Legend />
-                                <Bar dataKey="Attendance" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                                <Bar dataKey="Attendance" fill="#18216D" radius={[6, 6, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -147,7 +146,7 @@ const TeacherAttendanceRecord = () => {
                                         {record.attendanceRate}%
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <button className="text-blue-600 hover:text-blue-900">
+                                        <button className="text-[#18216D] hover:text-[#0D164F] transition-colors">
                                             <i className="fas fa-info-circle"></i>
                                         </button>
                                     </td>

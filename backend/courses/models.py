@@ -21,6 +21,16 @@ class Course(models.Model):
     is_active = models.BooleanField(default=True)
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE)
     students = models.ManyToManyField(Student, related_name='enrolled_courses')
+    
+    # CBC Integration
+    learning_area = models.ForeignKey(
+        'cbc.LearningArea', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='assigned_courses',
+        help_text="Link to the official CBC Learning Area registry entry"
+    )
 
     class Meta:
         ordering = ['name']
@@ -37,19 +47,55 @@ class Assignment(models.Model):
         ('Submitted', 'Submitted'),
         ('Graded', 'Graded')
     ]
+    
+    ASSESSMENT_TYPE_CHOICES = [
+        ('formative', 'Formative Assessment'),
+        ('summative', 'Summative Assessment'),
+    ]
 
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    # Traditional fields (for 8-4-4 compatibility)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField()
     due_date = models.DateTimeField()
-    total_marks = models.PositiveIntegerField()
+    total_marks = models.PositiveIntegerField(null=True, blank=True)  # Only for traditional grading
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='Pending')
+    
+    # CBC fields (NEW)
+    learning_area = models.ForeignKey(
+        'cbc.LearningArea',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='assignments'
+    )
+    learning_outcome = models.ForeignKey(
+        'cbc.LearningOutcome',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignments',
+        help_text="Specific learning outcome being assessed"
+    )
+    assessment_type = models.CharField(
+        max_length=20,
+        choices=ASSESSMENT_TYPE_CHOICES,
+        default='formative',
+        help_text="Type of CBC assessment"
+    )
 
     class Meta:
         ordering = ['due_date']
 
     def __str__(self):
+        if self.learning_area:
+            return f"{self.title} - {self.learning_area}"
         return f"{self.title} - {self.course}"
+    
+    @property
+    def is_cbc(self):
+        """Returns True if this is a CBC assignment"""
+        return self.learning_outcome is not None
 
 class Schedule(models.Model):
     DAY_CHOICES = [
@@ -90,7 +136,7 @@ class Attendance(models.Model):
 
 
 class Module(models.Model):
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules')
+    learning_area = models.ForeignKey('cbc.LearningArea', on_delete=models.CASCADE, related_name='lms_modules', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=1)
@@ -98,11 +144,11 @@ class Module(models.Model):
     release_date = models.DateField(blank=True, null=True)
 
     class Meta:
-        ordering = ['course', 'order']
-        unique_together = ('course', 'order')
+        ordering = ['learning_area', 'order']
+        unique_together = ('learning_area', 'order')
 
     def __str__(self):
-        return f"{self.course.code} · {self.title}"
+        return f"{self.learning_area.code if self.learning_area else 'N/A'} · {self.title}"
 
 
 class Lesson(models.Model):
@@ -157,6 +203,23 @@ class Quiz(models.Model):
     time_limit_minutes = models.PositiveIntegerField(default=0)
     max_attempts = models.PositiveIntegerField(default=1)
     is_published = models.BooleanField(default=False)
+
+    # CBC fields
+    learning_area = models.ForeignKey(
+        'cbc.LearningArea',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='quizzes'
+    )
+    learning_outcome = models.ForeignKey(
+        'cbc.LearningOutcome',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='quizzes',
+        help_text="Specific learning outcome being assessed"
+    )
 
     class Meta:
         ordering = ['lesson', 'title']
@@ -238,15 +301,37 @@ class AssignmentSubmission(models.Model):
         ('graded', 'Graded'),
         ('late', 'Late Submission'),
     ]
+    
+    COMPETENCY_LEVELS = [
+        ('EE', 'Exceeding Expectations'),
+        ('ME', 'Meeting Expectations'),
+        ('AE', 'Approaching Expectations'),
+        ('BE', 'Below Expectations'),
+    ]
 
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='assignment_submissions')
     submitted_at = models.DateTimeField(auto_now_add=True)
     file_url = models.URLField(blank=True)
     text_response = models.TextField(blank=True)
-    grade = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
     feedback = models.TextField(blank=True)
+    
+    # Traditional grading (for 8-4-4)
+    grade = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    
+    # CBC grading (NEW)
+    competency_level = models.CharField(
+        max_length=2,
+        choices=COMPETENCY_LEVELS,
+        null=True,
+        blank=True,
+        help_text="CBC competency level achieved"
+    )
+    competency_comment = models.TextField(
+        blank=True,
+        help_text="Teacher's comment on competency achievement"
+    )
 
     class Meta:
         ordering = ['-submitted_at']
@@ -254,6 +339,11 @@ class AssignmentSubmission(models.Model):
 
     def __str__(self):
         return f"{self.assignment.title} · {self.student.get_full_name()}"
+    
+    @property
+    def is_cbc_graded(self):
+        """Returns True if graded using CBC rubric"""
+        return self.competency_level is not None
 
 
 class DiscussionThread(models.Model):

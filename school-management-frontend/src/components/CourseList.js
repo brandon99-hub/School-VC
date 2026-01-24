@@ -8,8 +8,8 @@ import CourseModal from './CourseModal';
 
 const CourseList = () => {
     const { user } = useAuth();
-    const { get } = useApi();
-    const { courses, loading, error, dispatch, refresh } = useAppState();
+    const { get, post } = useApi();
+    const { courses, loading, error, dispatch, refresh, showToast } = useAppState();
     const navigate = useNavigate();
     const [availableCourses, setAvailableCourses] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,12 +17,11 @@ const CourseList = () => {
     const [availableLoading, setAvailableLoading] = useState(false);
     const [availableError, setAvailableError] = useState('');
     const [enrollmentError, setEnrollmentError] = useState('');
-    const [enrollmentSuccess, setEnrollmentSuccess] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [currentAvailablePage, setCurrentAvailablePage] = useState(1);
-    const coursesPerPage = 3;
-    const availableCoursesPerPage = 5;
+    const coursesPerPage = 6;
+    const availableCoursesPerPage = 10;
 
     useEffect(() => {
         const fetchAvailableCourses = async () => {
@@ -35,8 +34,15 @@ const CourseList = () => {
             }
             setAvailableLoading(true);
             try {
-                const allCourses = await get('/api/courses/');
-                setAvailableCourses(allCourses);
+                const queryParams = new URLSearchParams();
+                if (user?.grade_level) {
+                    queryParams.append('grade_level', user.grade_level);
+                }
+                // Fetch from CBC Learning Areas instead of Course objects
+                const data = await get(`/api/cbc/learning-areas/?${queryParams.toString()}`);
+                // Handle paginated response if applicable, otherwise default to direct array
+                const learningAreas = data.results || data;
+                setAvailableCourses(learningAreas);
             } catch (err) {
                 console.error('Available courses fetch error:', err);
                 setAvailableError('Failed to load available courses. Please try again later.');
@@ -49,23 +55,24 @@ const CourseList = () => {
         fetchAvailableCourses();
     }, [get, user, hasFetchedAvailable]);
 
-    const handleEnrollCourse = async (courseId) => {
+    const handleEnrollCourse = async (learningAreaId) => {
         if (!user?.id) {
             setEnrollmentError('User ID not found. Please log in again.');
             return;
         }
         setEnrollmentError('');
-        setEnrollmentSuccess('');
         try {
-            await enrollStudent(courseId);
+            // Use the new CBC enrollment endpoint with correct POST method
+            await post(`/api/cbc/learning-areas/${learningAreaId}/enroll/`);
             setIsModalOpen(false);
-            const updatedCourses = await get(`/students/${user.id}/courses/`);
-            dispatch({ type: 'SET_COURSES', payload: updatedCourses });
-            setEnrollmentSuccess('Course added to your schedule.');
+
+            // Refresh local state
+            setHasFetchedAvailable(false);
             refresh();
+            showToast('Learning Area added to your profile.', 'success');
         } catch (err) {
             console.error('Enrollment error:', err);
-            setEnrollmentError('Enrollment failed. Please try again.');
+            setEnrollmentError(err.response?.data?.error || 'Enrollment failed. Please try again.');
         }
     };
 
@@ -85,10 +92,10 @@ const CourseList = () => {
     };
 
     const getProgressColor = (progress) => {
-        if (progress >= 90) return 'bg-green-600';
-        if (progress >= 75) return 'bg-blue-600';
-        if (progress >= 50) return 'bg-yellow-500';
-        return 'bg-red-500';
+        if (progress >= 90) return 'bg-emerald-500';
+        if (progress >= 75) return 'bg-[#18216D]';
+        if (progress >= 50) return 'bg-[#FFC425]';
+        return 'bg-rose-500';
     };
 
     // Filter courses based on search term
@@ -146,113 +153,104 @@ const CourseList = () => {
     const enrolledCourseIds = courses.map((course) => course.id);
 
     return (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="bg-white rounded-3xl shadow-sm p-8 border border-gray-100">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-800">Enrolled Courses</h2>
-                    <p className="text-gray-500 text-sm mt-1">Your current semester courses</p>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">My Learning Areas</h2>
+                    <p className="text-gray-500 font-medium mt-1">Academic subjects and competency pathways</p>
                 </div>
-                <div className="flex gap-4">
-                    <div className="relative">
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                    <div className="relative flex-1 sm:min-w-[300px]">
                         <input
                             type="text"
-                            placeholder="Search courses by name, code, or teacher..."
+                            placeholder="Search subjects, codes, or teachers..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-[#18216D]/10 transition-all font-bold text-gray-900 placeholder-gray-400"
                         />
-                        <i className="fas fa-search absolute right-3 top-3 text-gray-400"></i>
+                        <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"></i>
                     </div>
                     <button
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                        className="px-6 py-3 bg-[#18216D] text-white rounded-2xl hover:bg-[#0D164F] transition-all font-black shadow-xl shadow-indigo-900/20 flex items-center justify-center space-x-2 text-xs uppercase tracking-widest"
                         onClick={() => setIsModalOpen(true)}
                     >
-                        <i className="fas fa-plus mr-2"></i>
-                        Add Course
+                        <i className="fas fa-plus"></i>
+                        <span>Register Subject</span>
                     </button>
                 </div>
             </div>
 
             {enrollmentError && (
-                <div className="text-red-500 mb-4">{enrollmentError}</div>
-            )}
-            {enrollmentSuccess && (
-                <div className="text-green-600 mb-4 flex items-center justify-between">
-                    <span>{enrollmentSuccess}</span>
-                    <button
-                        className="text-sm text-blue-600 hover:underline"
-                        onClick={() => setEnrollmentSuccess('')}
-                    >
-                        Dismiss
-                    </button>
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl font-bold mb-6 flex items-center">
+                    <i className="fas fa-exclamation-circle mr-3" />
+                    {enrollmentError}
                 </div>
             )}
 
             {currentCourses.length === 0 ? (
-                <div className="text-gray-500 p-4">
-                    No enrolled courses found.
-                    <button onClick={handleRefresh} className="ml-4 text-blue-600 hover:underline">
-                        Refresh
+                <div className="text-center py-24 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                    <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4">
+                        <i className="fas fa-book text-gray-300 text-2xl" />
+                    </div>
+                    <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">No learning areas registered yet.</p>
+                    <button onClick={handleRefresh} className="mt-4 text-blue-600 font-black text-sm uppercase tracking-wider hover:underline">
+                        Refresh Schedule
                     </button>
                 </div>
             ) : (
                 <>
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {currentCourses.map((course) => (
                             <div
                                 key={course.id}
-                                className="border rounded-xl p-4 hover:border-blue-500 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-md"
+                                className="group bg-white border border-gray-100 rounded-3xl p-6 hover:shadow-2xl hover:shadow-gray-200/50 transition-all duration-500 flex flex-col relative overflow-hidden"
                             >
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-1">{course.name}</h3>
-                                        <p className="text-gray-600 flex items-center">
-                                            <i className="fas fa-chalkboard-teacher mr-2"></i>
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/50 rounded-bl-full -mr-16 -mt-16 group-hover:scale-110 transition-transform"></div>
+
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <span className="px-3 py-1 text-[10px] font-black bg-[#18216D] text-white rounded-lg uppercase tracking-wider">{course.code}</span>
+                                        <button className="text-gray-200 hover:text-[#FFC425] transition-colors">
+                                            <i className="fas fa-bookmark stroke-[2]"></i>
+                                        </button>
+                                    </div>
+
+                                    <h3 className="text-xl font-black text-gray-900 mb-2 leading-tight group-hover:text-[#18216D] transition-colors">{course.name}</h3>
+
+                                    <div className="space-y-3 mt-4">
+                                        <div className="flex items-center text-sm font-bold text-gray-400">
+                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                                                <i className="fas fa-user-tie text-[10px]" />
+                                            </div>
                                             {course.teacher_name}
-                                        </p>
-                                        <p className="text-sm text-gray-500 flex items-center mt-1">
-                                            <i className="fas fa-clock mr-2"></i>
+                                        </div>
+                                        <div className="flex items-center text-sm font-bold text-gray-400">
+                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                                                <i className="fas fa-calendar-alt text-[10px]" />
+                                            </div>
                                             {course.schedule}
-                                        </p>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button className="text-gray-400 hover:text-blue-600 transition-colors">
-                                            <i className="fas fa-bookmark"></i>
-                                        </button>
-                                        <button className="text-gray-400 hover:text-blue-600 transition-colors">
-                                            <i className="fas fa-ellipsis-v"></i>
-                                        </button>
-                                    </div>
-                                </div>
 
-                                <div className="mt-4">
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-gray-600">Course Progress</span>
-                                        <span
-                                            className={`font-medium ${
-                                                course.progress >= 75 ? 'text-blue-600' : 'text-gray-600'
-                                            }`}
-                                        >
-                                            {course.progress}%
-                                        </span>
+                                    <div className="mt-8">
+                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                                            <span>Sub-strand Progress</span>
+                                            <span className="text-[#18216D]">{course.progress}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                                            <div
+                                                className={`${getProgressColor(course.progress)} h-full rounded-full transition-all duration-1000 ease-out`}
+                                                style={{ width: `${course.progress}%` }}
+                                            ></div>
+                                        </div>
                                     </div>
-                                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                                        <div
-                                            className={`${getProgressColor(
-                                                course.progress
-                                            )} h-2 rounded-full transition-all duration-500 ease-out`}
-                                            style={{ width: `${course.progress}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
 
-                                <div className="mt-4 flex justify-end">
                                     <button
-                                        className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors flex items-center"
+                                        className="w-full mt-8 py-4 bg-slate-50 text-[#18216D] rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#18216D] hover:text-white transition-all shadow-sm group-hover:shadow-xl group-hover:shadow-indigo-900/10 flex items-center justify-center space-x-2"
                                         onClick={() => handleViewDetails(course.id)}
                                     >
-                                        View Details
-                                        <i className="fas fa-chevron-right ml-2"></i>
+                                        <span>Continue Learning</span>
+                                        <i className="fas fa-arrow-right text-[10px]" />
                                     </button>
                                 </div>
                             </div>

@@ -1,36 +1,61 @@
-/* index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --kianda-navy: #18216D;
+  --kianda-gold: #FFC425;
+  --kianda-navy-dark: #0D164F;
+  --kianda-navy-light: rgba(24, 33, 109, 0.05);
+  --kianda-gold-light: rgba(255, 196, 37, 0.1);
+}
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
-  @apply bg-gray-50;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  @apply bg-slate-50 text-slate-900;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Custom Scrollbar for Registry */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer components {
+  .kianda-gradient {
+    @apply bg-gradient-to-br from-[#18216D] to-[#0D164F];
+  }
+
+  .kianda-glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl;
+  }
+
+  .btn-kianda {
+    @apply px-6 py-3 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#0D164F] hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-200;
+  }
+
+  .btn-gold {
+    @apply px-6 py-3 bg-[#FFC425] text-[#18216D] rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#EBB420] hover:scale-105 active:scale-95 transition-all shadow-lg shadow-yellow-100;
+  }
+
+  .nav-active {
+    @apply bg-[#18216D] text-white shadow-lg shadow-indigo-500/30;
+  }
 }
 
 @layer utilities {
-  .animate-slide-in-up {
-    animation: slide-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  @keyframes slide-in-up {
-    from {
-      transform: translateY(100%) scale(0.9);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-    }
+  .animate-in {
+    animation-duration: 400ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: both;
   }
 }

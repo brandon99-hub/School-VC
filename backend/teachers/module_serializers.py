@@ -7,7 +7,7 @@ class ModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Module
-        fields = ['id', 'course', 'title', 'description', 'order', 'is_published', 'release_date', 'lessons']
+        fields = ['id', 'learning_area', 'title', 'description', 'order', 'is_published', 'release_date', 'lessons']
         read_only_fields = ['id']
 
     def get_lessons(self, obj):
@@ -19,7 +19,7 @@ class ModuleSerializer(serializers.ModelSerializer):
 class ModuleCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Module
-        fields = ['course', 'title', 'description', 'order', 'is_published', 'release_date']
+        fields = ['learning_area', 'title', 'description', 'order', 'is_published', 'release_date']
 
     def validate_order(self, value):
         if value < 1:

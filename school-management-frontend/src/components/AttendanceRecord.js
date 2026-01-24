@@ -71,147 +71,146 @@ const AttendanceRecord = () => {
         );
 
     return (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-gray-100">
-                    <div>
-                        <p className="text-sm uppercase tracking-wide text-gray-400">Attendance</p>
-                        <h2 className="text-2xl font-semibold text-gray-900">Your semester record</h2>
-                        <p className="text-gray-500 text-sm mt-1">
-                            Toggle between insights and detailed history.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
-                            {['chart', 'table'].map((option) => (
-                                <button
-                                    key={option}
-                                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                                        view === option
-                                            ? 'bg-white shadow text-blue-600'
-                                            : 'text-gray-500 hover:text-gray-700'
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-gray-100">
+                <div>
+                    <p className="text-sm uppercase tracking-wide text-gray-400">Attendance</p>
+                    <h2 className="text-2xl font-semibold text-gray-900">Your semester record</h2>
+                    <p className="text-gray-500 text-sm mt-1">
+                        Toggle between insights and detailed history.
+                    </p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                        {['chart', 'table'].map((option) => (
+                            <button
+                                key={option}
+                                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${view === option
+                                    ? 'bg-white shadow-sm text-[#18216D]'
+                                    : 'text-slate-400 hover:text-slate-600'
                                     }`}
-                                    onClick={() => setView(option)}
-                                >
-                                    {option === 'chart' ? 'Chart' : 'Table'}
-                                </button>
-                            ))}
-                        </div>
-                        <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
-                            <i className="fas fa-filter mr-2 text-gray-500"></i>
-                            Filter
-                        </button>
-                        <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
-                            <i className="fas fa-download mr-2 text-gray-500"></i>
-                            Export
-                        </button>
+                                onClick={() => setView(option)}
+                            >
+                                {option === 'chart' ? 'Chart' : 'Table'}
+                            </button>
+                        ))}
+                    </div>
+                    <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+                        <i className="fas fa-filter mr-2 text-gray-500"></i>
+                        Filter
+                    </button>
+                    <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center">
+                        <i className="fas fa-download mr-2 text-gray-500"></i>
+                        Export
+                    </button>
+                </div>
+            </div>
+
+            {view === 'chart' ? (
+                <div className="px-6 py-8">
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData}>
+                                <defs>
+                                    <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorAbsent" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorLate" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="date" stroke="#94a3b8" />
+                                <YAxis allowDecimals={false} stroke="#94a3b8" />
+                                <Tooltip />
+                                <Legend />
+                                <Area
+                                    type="monotone"
+                                    dataKey="Present"
+                                    stroke="#16a34a"
+                                    fillOpacity={1}
+                                    fill="url(#colorPresent)"
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="Absent"
+                                    stroke="#dc2626"
+                                    fillOpacity={1}
+                                    fill="url(#colorAbsent)"
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="Late"
+                                    stroke="#ea580c"
+                                    fillOpacity={1}
+                                    fill="url(#colorLate)"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
-
-                {view === 'chart' ? (
-                    <div className="px-6 py-8">
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorAbsent" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorLate" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                    <XAxis dataKey="date" stroke="#94a3b8" />
-                                    <YAxis allowDecimals={false} stroke="#94a3b8" />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="Present"
-                                        stroke="#16a34a"
-                                        fillOpacity={1}
-                                        fill="url(#colorPresent)"
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="Absent"
-                                        stroke="#dc2626"
-                                        fillOpacity={1}
-                                        fill="url(#colorAbsent)"
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="Late"
-                                        stroke="#ea580c"
-                                        fillOpacity={1}
-                                        fill="url(#colorLate)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto px-6 py-4">
-                        <table className="min-w-full divide-y divide-gray-100">
-                            <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-xl">
-                                        Date
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Course
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-xl">
-                                        Actions
-                                    </th>
+            ) : (
+                <div className="overflow-x-auto px-6 py-4">
+                    <table className="min-w-full divide-y divide-gray-100">
+                        <thead>
+                            <tr className="bg-gray-50">
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-xl">
+                                    Date
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    Course
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-xl">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                            {attendanceRecords.map((record) => (
+                                <tr key={record.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {new Date(record.date).toLocaleDateString('en-US', {
+                                            weekday: 'short',
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                        })}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className="text-sm font-semibold text-gray-900">{record.course}</span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span
+                                            className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full border ${getStatusStyles(
+                                                record.status
+                                            )}`}
+                                        >
+                                            {record.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                                        <button className="text-[#18216D] hover:text-[#0D164F] transition-colors">
+                                            <i className="fas fa-info-circle"></i>
+                                        </button>
+                                        <button className="text-gray-400 hover:text-gray-600">
+                                            <i className="fas fa-ellipsis-v"></i>
+                                        </button>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-100">
-                                {attendanceRecords.map((record) => (
-                                    <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {new Date(record.date).toLocaleDateString('en-US', {
-                                                weekday: 'short',
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric',
-                                            })}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="text-sm font-semibold text-gray-900">{record.course}</span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span
-                                                className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full border ${getStatusStyles(
-                                                    record.status
-                                                )}`}
-                                            >
-                                                {record.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                                            <button className="text-blue-600 hover:text-blue-900">
-                                                <i className="fas fa-info-circle"></i>
-                                            </button>
-                                            <button className="text-gray-400 hover:text-gray-600">
-                                                <i className="fas fa-ellipsis-v"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
                 <div className="text-sm text-gray-500">

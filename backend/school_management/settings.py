@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'django_prometheus',
     'students.apps.StudentsConfig',
     'courses.apps.CoursesConfig',
+    'cbc.apps.CbcConfig',  # CBC (Competency-Based Curriculum)
+    'finance.apps.FinanceConfig',  # Finance Management
 ]
 
 MIDDLEWARE = [

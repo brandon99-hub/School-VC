@@ -38,7 +38,7 @@ const Navbar = () => {
             { to: '/profile', label: 'Profile', icon: 'fa-id-badge', roles: ['student', 'teacher'] },
         ];
         const studentLinks = [
-            { to: '/courses', label: 'My Courses', icon: 'fa-layer-group', roles: ['student'] },
+            { to: '/courses', label: 'Learning Areas', icon: 'fa-layer-group', roles: ['student'] },
             { to: '/attendance', label: 'Attendance', icon: 'fa-calendar-check', roles: ['student'] },
         ];
         const teacherLinks = [
@@ -49,12 +49,6 @@ const Navbar = () => {
             link.roles.includes(role)
         );
     }, [user]);
-
-    const filteredQuickLinks = useMemo(() => {
-        if (!searchQuery) return quickLinks;
-        const lowered = searchQuery.toLowerCase();
-        return quickLinks.filter((link) => link.label.toLowerCase().includes(lowered));
-    }, [quickLinks, searchQuery]);
 
     const unreadCount = useMemo(() => notifications.filter((notification) => !notification.is_read).length, [notifications]);
 
@@ -126,18 +120,21 @@ const Navbar = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center space-x-6">
-                        <Link to="/dashboard" className="flex items-center space-x-2">
-                            <span className="text-xl font-semibold text-gray-900">SchoolOS</span>
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-600">beta</span>
+                        <Link to="/dashboard" className="flex items-center gap-5 group">
+                            <img src="/kianda-school-logo.png" alt="Kianda School" className="h-20 w-auto object-contain transition-transform duration-500 group-hover:scale-110" />
+                            <div className="flex flex-col">
+                                <span className="text-xl font-black text-[#18216D] uppercase tracking-tighter leading-none">Kianda School</span>
+                                <span className="text-[11px] font-bold text-[#FFC425] uppercase tracking-[0.3em] leading-none mt-2">Management Portal</span>
+                            </div>
                         </Link>
                         <div className="hidden md:flex items-center space-x-2">
                             {primaryLinks.map((link) => (
                                 <Link
                                     key={link.to}
                                     to={link.to}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${location.pathname === link.to
-                                            ? 'bg-indigo-50 text-indigo-700'
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${location.pathname === link.to
+                                        ? 'bg-[#18216D] text-white shadow-lg shadow-indigo-900/20'
+                                        : 'text-slate-500 hover:text-[#18216D] hover:bg-slate-50'
                                         }`}
                                 >
                                     {link.label}
@@ -189,7 +186,7 @@ const Navbar = () => {
                                 aria-expanded={isUserMenuOpen}
                                 aria-label="User menu"
                             >
-                                <span className="h-9 w-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold">
+                                <span className="h-9 w-9 rounded-full bg-[#18216D] text-white flex items-center justify-center text-sm font-black shadow-lg shadow-indigo-900/10">
                                     {initials || 'U'}
                                 </span>
                                 <div className="text-left">
@@ -200,37 +197,23 @@ const Navbar = () => {
                             </button>
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20">
-                                    <div className="px-4 py-3 border-b border-gray-100">
-                                        <p className="text-sm font-semibold text-gray-900">{displayName}</p>
-                                        <p className="text-xs text-gray-500 break-all">{user?.email}</p>
+                                    <div className="px-5 py-4 border-b border-gray-100 bg-slate-50/50">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Authenticated as</p>
+                                        <p className="text-sm font-black text-[#18216D] capitalize">{user?.role || 'User'}</p>
                                     </div>
-                                    <div className="p-3 border-b border-gray-100">
-                                        <div className="flex items-center bg-gray-50 rounded-lg px-3">
-                                            <i className="fas fa-search text-gray-400 mr-2" aria-hidden="true"></i>
-                                            <input
-                                                value={searchQuery}
-                                                onChange={(event) => setSearchQuery(event.target.value)}
-                                                placeholder="Filter destinations..."
-                                                className="w-full bg-transparent py-2 text-sm focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                    <ul className="max-h-64 overflow-y-auto divide-y divide-gray-50" data-testid="quick-link-list">
-                                        {filteredQuickLinks.length === 0 && (
-                                            <li className="px-4 py-6 text-sm text-gray-500 text-center">No matches found.</li>
-                                        )}
-                                        {filteredQuickLinks.map((link) => (
+                                    <ul className="divide-y divide-gray-50" data-testid="quick-link-list">
+                                        {quickLinks.map((link) => (
                                             <li key={link.to}>
                                                 <button
-                                                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-indigo-50 transition-colors"
+                                                    className="w-full flex items-center gap-4 px-6 py-4 text-left hover:bg-slate-50 transition-all border-l-4 border-transparent hover:border-[#FFC425] group"
                                                     onClick={() => handleNavigate(link.to)}
                                                 >
-                                                    <span className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                                                    <span className="h-10 w-10 rounded-xl bg-[#18216D]/5 text-[#18216D] flex items-center justify-center group-hover:bg-[#18216D] group-hover:text-white transition-all shadow-sm">
                                                         <i className={`fas ${link.icon}`} aria-hidden="true"></i>
                                                     </span>
                                                     <div>
-                                                        <p className="text-sm font-semibold text-gray-900">{link.label}</p>
-                                                        <p className="text-xs text-gray-500 capitalize">{user?.role || 'student'}</p>
+                                                        <p className="text-sm font-black text-gray-900 group-hover:text-[#18216D] transition-colors">{link.label}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Quick Access</p>
                                                     </div>
                                                 </button>
                                             </li>
@@ -280,7 +263,7 @@ const Navbar = () => {
                                 <button
                                     key={link.to}
                                     onClick={() => handleNavigate(link.to)}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium ${location.pathname === link.to ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'
+                                    className={`w-full text-left px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest ${location.pathname === link.to ? 'bg-[#18216D] text-white shadow-lg shadow-indigo-900/10' : 'text-slate-500 hover:bg-slate-50'
                                         }`}
                                 >
                                     {link.label}

@@ -70,15 +70,15 @@ class ScheduleAdmin(admin.ModelAdmin):
 
 @admin.register(Module)
 class ModuleAdmin(admin.ModelAdmin):
-    list_display = ('title', 'course', 'order', 'is_published')
-    list_filter = ('course', 'is_published')
-    search_fields = ('title', 'course__name', 'course__code')
+    list_display = ('title', 'learning_area', 'order', 'is_published')
+    list_filter = ('learning_area', 'is_published')
+    search_fields = ('title', 'learning_area__name', 'learning_area__code')
 
 
 @admin.register(Lesson)
 class LessonAdmin(admin.ModelAdmin):
     list_display = ('title', 'module', 'order', 'is_published')
-    list_filter = ('module__course', 'is_published')
+    list_filter = ('module__learning_area', 'is_published')
     search_fields = ('title', 'module__title')
 
 
@@ -97,7 +97,7 @@ class QuizQuestionInline(admin.TabularInline):
 @admin.register(Quiz)
 class QuizAdmin(admin.ModelAdmin):
     list_display = ('title', 'lesson', 'time_limit_minutes', 'is_published')
-    list_filter = ('is_published', 'lesson__module__course')
+    list_filter = ('is_published', 'lesson__module__learning_area')
     inlines = [QuizQuestionInline]
 
 

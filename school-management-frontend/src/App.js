@@ -20,6 +20,10 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import TeacherCourseList from './pages/teacher/TeacherCourseList';
 import TeacherCourseView from './pages/teacher/TeacherCourseView';
 import ToastContainer from './components/common/ToastContainer';
+import BulkGrading from './components/teacher/BulkGrading';
+import ParentDashboard from './pages/parent/ParentDashboard';
+import ChildFinances from './pages/parent/ChildFinances';
+import SubmissionListPage from './pages/teacher/SubmissionListPage';
 
 function App() {
     const { isAuthenticated, loading: authLoading, user } = useAuth();
@@ -208,6 +212,36 @@ function App() {
                                 )
                             ) : (
                                 <Navigate to="/login" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/teacher/bulk-grading/:assignmentId"
+                        element={
+                            isAuthenticated && user?.role === 'teacher' ? (
+                                <BulkGrading />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/teacher/assignments/:assignmentId/submissions"
+                        element={
+                            isAuthenticated && user?.role === 'teacher' ? (
+                                <SubmissionListPage />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/parent/*"
+                        element={
+                            isAuthenticated && user?.role === 'parent' ? (
+                                <ParentDashboard />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
                             )
                         }
                     />

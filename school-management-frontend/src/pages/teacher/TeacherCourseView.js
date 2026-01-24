@@ -21,33 +21,79 @@ import GradeBook from '../../components/teacher/GradeBook';
 import DiscussionManager from '../../components/teacher/DiscussionManager';
 import ScheduleManager from '../../components/teacher/ScheduleManager';
 
-const Tabs = ({ tabs, activeTab, onChange }) => (
-    <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    onClick={() => onChange(tab.id)}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center ${activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }`}
-                >
-                    {tab.icon}
-                    <span>{tab.label}</span>
-                </button>
-            ))}
-        </nav>
-    </div>
+const SidebarItem = ({ id, label, icon: Icon, active, collapsed, onClick }) => (
+    <button
+        onClick={() => onClick(id)}
+        className={`w-full flex items-center p-3 mb-2 rounded-xl transition-all group ${active
+            ? 'bg-[#18216D] text-white shadow-lg shadow-indigo-900/30'
+            : 'text-slate-400 hover:bg-slate-50 hover:text-[#18216D]'
+            }`}
+        title={collapsed ? label : ''}
+    >
+        <div className={`flex items-center justify-center ${collapsed ? 'w-full' : ''}`}>
+            <Icon className={`w-6 h-6 transition-transform group-hover:scale-110 ${active ? 'text-white' : 'text-slate-300 group-hover:text-[#18216D]'}`} />
+        </div>
+        {!collapsed && (
+            <span className="ml-3 font-bold text-sm tracking-tight whitespace-nowrap overflow-hidden transition-all duration-300">
+                {label}
+            </span>
+        )}
+        {active && !collapsed && (
+            <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full"></div>
+        )}
+    </button>
 );
+
+const Sidebar = ({ activeTab, onChange, collapsed }) => {
+    const items = [
+        { id: 'content', label: 'Curriculum Strands', icon: BookOpenIcon },
+        { id: 'assignments', label: 'Assignments', icon: ClipboardDocumentCheckIcon },
+        { id: 'quizzes', label: 'Quizzes', icon: QuestionMarkCircleIcon },
+        { id: 'gradebook', label: 'Competency Grades', icon: ChartBarIcon },
+        { id: 'students', label: 'Students', icon: UsersIcon },
+        { id: 'discussions', label: 'Discussions', icon: ChatBubbleLeftRightIcon },
+        { id: 'schedule', label: 'Schedule', icon: CalendarIcon },
+    ];
+
+    return (
+        <div className={`flex flex-col h-full bg-white border-r border-gray-100 transition-all duration-300 ${collapsed ? 'w-20' : 'w-72'}`}>
+            <div className="p-4 flex-1 overflow-y-auto">
+                {items.map((item) => (
+                    <SidebarItem
+                        key={item.id}
+                        {...item}
+                        active={activeTab === item.id}
+                        collapsed={collapsed}
+                        onClick={onChange}
+                    />
+                ))}
+            </div>
+
+            <div className="p-4 border-t border-gray-100">
+                <Link
+                    to="/teacher/courses"
+                    className="flex items-center p-3 text-gray-400 hover:text-red-500 transition-colors group"
+                    title={collapsed ? "Exit to Registry" : ""}
+                >
+                    <div className={`flex items-center justify-center ${collapsed ? 'w-full' : ''}`}>
+                        <svg className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
+                        </svg>
+                    </div>
+                    {!collapsed && <span className="ml-3 font-bold text-sm">Exit Area</span>}
+                </Link>
+            </div>
+        </div>
+    );
+};
 
 const TeacherCourseView = () => {
     const { id } = useParams();
     const { get } = useApi();
     const [course, setCourse] = useState(null);
-    const [modules, setModules] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('content');
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [lessons, setLessons] = useState([]);
     const [quizzes, setQuizzes] = useState([]);
     const [showQuizBuilder, setShowQuizBuilder] = useState(false);
@@ -55,47 +101,21 @@ const TeacherCourseView = () => {
     const [showDiscussionManager, setShowDiscussionManager] = useState(false);
     const [showScheduleManager, setShowScheduleManager] = useState(false);
     const [selectedLessonForQuiz, setSelectedLessonForQuiz] = useState(null);
-    const [error, setError] = useState(null); // Added error state
 
     const fetchCourseData = useCallback(async () => {
         try {
             setLoading(true);
-            const [coursesResponse, modulesData] = await Promise.all([
-                get(`/teachers/api/courses/`),
-                get(`/api/teacher/courses/${id}/modules/`)
-            ]);
+            // Fetch Course details (linked to Registry)
+            const courseResponse = await get(`/teachers/api/courses/${id}/`);
+            setCourse(courseResponse);
 
-            // Handle new API structure: {courses: [...], unique_student_count: N}
-            const coursesArray = coursesResponse?.courses || [];
-            const foundCourse = coursesArray.find(c => c.id === parseInt(id));
-
-            if (!foundCourse) {
-                setError('Course not found');
-                setLoading(false);
-                return;
-            }
-
-            setCourse(foundCourse);
-            setModules(modulesData || []);
-
-            // Extract all lessons from modules
-            const allLessons = (modulesData || []).flatMap(m => m.lessons || []);
+            // Map modules to strands and flatten to sub-strands (lessons)
+            const allModules = courseResponse.modules || [];
+            const allLessons = allModules.flatMap(m => m.sub_strands || []);
             setLessons(allLessons);
 
-            // Fetch quizzes for all lessons
-            const allQuizzes = [];
-            for (const lesson of allLessons) {
-                try {
-                    const lessonQuizzes = await get(`/api/teacher/lessons/${lesson.id}/quizzes/`);
-                    allQuizzes.push(...(lessonQuizzes || []));
-                } catch (err) {
-                    console.error(`Error fetching quizzes for lesson ${lesson.id}:`, err);
-                }
-            }
-            setQuizzes(allQuizzes);
         } catch (error) {
             console.error('Error fetching course data:', error);
-            setError('Failed to load course data');
         } finally {
             setLoading(false);
         }
@@ -115,13 +135,6 @@ const TeacherCourseView = () => {
         setShowQuizBuilder(true);
     };
 
-    const handleSaveQuiz = async (savedQuiz) => {
-        setShowQuizBuilder(false);
-        setEditingQuiz(null);
-        setSelectedLessonForQuiz(null);
-        // Refresh course data to get updated quizzes
-        await fetchCourseData();
-    };
 
     const handleEditQuiz = (quiz) => {
         setEditingQuiz(quiz);
@@ -139,29 +152,25 @@ const TeacherCourseView = () => {
         }
     };
 
-    const tabs = [
-        { id: 'content', label: 'Content', icon: <BookOpenIcon className="h-5 w-5 mr-2" /> },
-        { id: 'assignments', label: 'Assignments', icon: <ClipboardDocumentCheckIcon className="h-5 w-5 mr-2" /> },
-        { id: 'quizzes', label: 'Quizzes', icon: <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> },
-        { id: 'students', label: 'Students', icon: <UsersIcon className="h-5 w-5 mr-2" /> },
-        { id: 'grades', label: 'Grades', icon: <ChartBarIcon className="h-5 w-5 mr-2" /> },
-    ];
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-gray-500">Loading course...</div>
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-14 w-14 border-4 border-[#18216D]/10 border-t-[#18216D] mb-6 shadow-sm"></div>
+                <div className="text-[#18216D] font-black uppercase tracking-[0.3em] text-[10px]">Synchronizing Academy Data...</div>
             </div>
         );
     }
 
     if (!course) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <p className="text-gray-500 mb-4">Course not found</p>
-                    <Link to="/teacher/courses" className="text-blue-600 hover:text-blue-800">
-                        ← Back to courses
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="text-center bg-white p-16 rounded-[2.5rem] shadow-2xl shadow-indigo-900/10 max-w-md w-full border border-slate-50">
+                    <div className="text-6xl mb-8">🔍</div>
+                    <h3 className="text-2xl font-black text-[#18216D] mb-2 tracking-tight">Learning Area Not Found</h3>
+                    <p className="text-slate-400 mb-10 font-medium">The subject you're looking for might have been moved or unassigned.</p>
+                    <Link to="/teacher/courses" className="inline-block px-10 py-4 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-900/20 hover:bg-[#0D164F] transition-all">
+                        ← Back to My Learning Areas
                     </Link>
                 </div>
             </div>
@@ -169,79 +178,71 @@ const TeacherCourseView = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
-                <div className="mb-6">
-                    <Link to="/teacher/courses" className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-2 inline-block">
-                        ← Back to courses
-                    </Link>
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900">{course.name}</h1>
-                            <p className="text-gray-600 mt-1">{course.code} • {course.credits} Credits</p>
-                        </div>
-                        <span className={`px-3 py-1 text-sm font-medium rounded-full ${course.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                            }`}>
-                            {course.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                    </div>
-                </div>
+        <div className="flex h-screen bg-gray-50 overflow-hidden">
+            {/* Sidebar */}
+            <Sidebar
+                activeTab={activeTab}
+                onChange={(tab) => {
+                    setActiveTab(tab);
+                    if (tab === 'discussions') setShowDiscussionManager(true);
+                    else if (tab === 'schedule') setShowScheduleManager(true);
+                }}
+                collapsed={isSidebarCollapsed}
+            />
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Students</div>
-                        <div className="text-2xl font-bold text-gray-900 mt-1">
-                            {course.enrolled_students_count || 0}
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* Premium Header */}
+                <header className="bg-white border-b border-gray-100 z-10">
+                    <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <button
+                                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                                className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+                            >
+                                <svg className={`w-6 h-6 transition-transform ${isSidebarCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-sm border border-slate-100">
+                                    <img src="/kianda-school-logo.png" alt="Kianda School" className="h-full object-contain" />
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl font-black text-[#18216D] tracking-tighter flex items-center leading-none">
+                                        {course.name}
+                                        <span className="ml-3 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] bg-[#FFC425]/10 text-[#18216D] rounded-full border border-[#FFC425]/20">
+                                            GRADE {course.grade_level_name?.replace('Grade ', '') || '4'}
+                                        </span>
+                                    </h1>
+                                    <p className="text-[10px] font-black text-slate-400 flex items-center mt-1 uppercase tracking-widest">
+                                        <span className="text-[#18216D] bg-[#18216D]/5 px-1.5 py-0.5 rounded mr-2">{course.code}</span>
+                                        • National Standards Portal
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Modules</div>
-                        <div className="text-2xl font-bold text-gray-900 mt-1">
-                            {course.modules?.length || 0}
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Assignments</div>
-                        <div className="text-2xl font-bold text-gray-900 mt-1">
-                            {course.assignments?.length || 0}
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <div className="text-sm text-gray-600">Pending Submissions</div>
-                        <div className="text-2xl font-bold text-gray-900 mt-1">0</div>
-                    </div>
-                </div>
 
-                {/* Tabs */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div className="px-6">
-                        <Tabs
-                            tabs={[
-                                { id: 'content', label: 'Content', icon: <BookOpenIcon className="w-5 h-5 mr-2" /> },
-                                { id: 'assignments', label: 'Assignments', icon: <ClipboardDocumentCheckIcon className="w-5 h-5 mr-2" /> },
-                                { id: 'quizzes', label: 'Quizzes', icon: <QuestionMarkCircleIcon className="w-5 h-5 mr-2" /> },
-                                { id: 'gradebook', label: 'Gradebook', icon: <ChartBarIcon className="w-5 h-5 mr-2" /> },
-                                { id: 'discussions', label: 'Discussions', icon: <ChatBubbleLeftRightIcon className="w-5 h-5 mr-2" /> },
-                                { id: 'schedule', label: 'Schedule', icon: <CalendarIcon className="w-5 h-5 mr-2" /> },
-                            ]}
-                            activeTab={activeTab}
-                            onChange={(tab) => {
-                                setActiveTab(tab);
-                                if (tab === 'discussions') {
-                                    setShowDiscussionManager(true);
-                                } else if (tab === 'schedule') {
-                                    setShowScheduleManager(true);
-                                }
-                            }}
-                        />
+                        <div className="hidden md:flex items-center space-x-4">
+                            <div className="text-center bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                                <div className="text-lg font-black text-[#18216D] leading-none">{course.enrolled_students_count || 0}</div>
+                                <div className="text-[8px] font-black text-slate-400 uppercase mt-1 tracking-[0.2em]">Scholars</div>
+                            </div>
+                            <div className="text-center bg-[#18216D] px-4 py-2 rounded-2xl shadow-lg shadow-indigo-900/10">
+                                <div className="text-lg font-black text-white leading-none">{course.modules?.length || 0}</div>
+                                <div className="text-[8px] font-black text-indigo-200 uppercase mt-1 tracking-[0.2em]">Strands</div>
+                            </div>
+                            <div className="text-center bg-[#FFC425] px-4 py-2 rounded-2xl shadow-lg shadow-yellow-500/10">
+                                <div className="text-lg font-black text-[#18216D] leading-none">{course.assignments?.length || 0}</div>
+                                <div className="text-[8px] font-black text-[#18216D]/60 uppercase mt-1 tracking-[0.2em]">Tasks</div>
+                            </div>
+                        </div>
                     </div>
+                </header>
 
-                    {/* Tab Content */}
-                    <div className="p-6">
+                {/* Content Area */}
+                <main className="flex-1 overflow-y-auto p-8 relative">
+                    <div className="max-w-6xl mx-auto">
                         {activeTab === 'content' && (
                             <ModuleList courseId={id} />
                         )}
@@ -252,66 +253,73 @@ const TeacherCourseView = () => {
 
                         {activeTab === 'quizzes' && (
                             <div>
-                                <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center justify-between mb-10">
                                     <div>
-                                        <h2 className="text-xl font-bold text-gray-900">Quizzes</h2>
-                                        <p className="text-sm text-gray-500">Manage assessments and automated tests</p>
+                                        <h2 className="text-3xl font-black text-gray-900 tracking-tight">Interactive Quizzes</h2>
+                                        <p className="text-gray-500 font-medium mt-1">Manage assessments and automated competency checks</p>
                                     </div>
                                     <button
                                         onClick={handleCreateQuiz}
-                                        className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-500/20 flex items-center space-x-2"
+                                        className="px-6 py-3 bg-[#18216D] text-white rounded-xl hover:bg-[#0D164F] transition-all font-black shadow-xl shadow-indigo-900/20 flex items-center space-x-3 text-xs uppercase tracking-widest"
                                     >
-                                        <PlusIcon className="w-5 h-5" />
-                                        <span>Create Quiz</span>
+                                        <PlusIcon className="w-5 h-5 stroke-[4]" />
+                                        <span>Create New Quiz</span>
                                     </button>
                                 </div>
 
                                 {quizzes.length === 0 ? (
-                                    <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                        <QuestionMarkCircleIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                                        <h3 className="text-lg font-bold text-gray-900 mb-1">No quizzes yet</h3>
-                                        <p className="text-gray-500 max-w-sm mx-auto mb-6">Create interactive quizzes to test student knowledge and automate grading.</p>
+                                    <div className="text-center py-24 bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-indigo-900/5">
+                                        <div className="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+                                            <QuestionMarkCircleIcon className="h-10 w-10 text-slate-300" />
+                                        </div>
+                                        <h3 className="text-2xl font-black text-[#18216D] mb-2 tracking-tight">Build Your Assessment</h3>
+                                        <p className="text-slate-400 max-w-md mx-auto mb-10 font-medium italic">Create interactive quizzes to evaluate student competencies and automate your grading workflow.</p>
                                         <button
                                             onClick={handleCreateQuiz}
-                                            className="px-6 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors shadow-sm"
+                                            className="px-10 py-4 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#0D164F] transition-all shadow-xl shadow-indigo-900/20"
                                         >
-                                            Build Your First Quiz
+                                            Configure First Quiz
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="grid gap-4">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         {quizzes.map((quiz) => (
-                                            <div key={quiz.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center space-x-3 mb-2">
-                                                            <h3 className="text-lg font-bold text-gray-900">{quiz.title}</h3>
-                                                            {quiz.is_published ? (
-                                                                <span className="px-2 py-0.5 text-xs font-bold bg-green-50 text-green-700 rounded-full border border-green-100">Live</span>
-                                                            ) : (
-                                                                <span className="px-2 py-0.5 text-xs font-bold bg-gray-50 text-gray-600 rounded-full border border-gray-100">Draft</span>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center space-x-4 text-xs text-gray-500 font-medium">
-                                                            <span className="flex items-center"><ClockIcon className="w-3.5 h-3.5 mr-1" /> {quiz.time_limit_minutes > 0 ? `${quiz.time_limit_minutes}m` : 'Unlimited'}</span>
-                                                            <span>{quiz.questions?.length || 0} Questions</span>
-                                                            <span className="text-blue-600">Lesson: {lessons.find(l => l.id === quiz.lesson)?.title || 'Unknown'}</span>
+                                            <div key={quiz.id} className="bg-white rounded-3xl border border-gray-100 p-6 hover:shadow-xl hover:shadow-gray-200/50 transition-all group relative overflow-hidden">
+                                                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+                                                <div className="relative z-10 flex flex-col h-full">
+                                                    <div className="flex items-start justify-between mb-4">
+                                                        <div>
+                                                            <div className="flex items-center space-x-3 mb-2">
+                                                                <h3 className="text-xl font-bold text-gray-900">{quiz.title}</h3>
+                                                                {quiz.is_published ? (
+                                                                    <span className="px-2.5 py-1 text-[10px] font-black bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-widest">Live</span>
+                                                                ) : (
+                                                                    <span className="px-2.5 py-1 text-[10px] font-black bg-gray-50 text-gray-500 rounded-full border border-gray-100 uppercase tracking-widest">Draft</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs font-black text-[#18216D] uppercase tracking-widest mt-1">
+                                                                Sub-strand: {lessons.find(l => l.id === quiz.lesson)?.title || 'Unassigned'}
+                                                            </p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                                                    <div className="flex items-center space-x-6 text-xs font-black text-gray-400 mt-auto uppercase tracking-wider">
+                                                        <span className="flex items-center"><ClockIcon className="w-4 h-4 mr-2" /> {quiz.time_limit_minutes > 0 ? `${quiz.time_limit_minutes} Mins` : 'Unlimited'}</span>
+                                                        <span className="flex items-center"><ClipboardDocumentCheckIcon className="w-4 h-4 mr-2" /> {quiz.questions?.length || 0} Questions</span>
+                                                    </div>
+
+                                                    <div className="mt-6 flex items-center space-x-3">
                                                         <button
                                                             onClick={() => handleEditQuiz(quiz)}
-                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                            title="Edit Quiz"
+                                                            className="flex-1 py-3 bg-gray-50 text-gray-700 rounded-xl font-black hover:bg-gray-100 transition-all text-center"
                                                         >
-                                                            <PencilSquareIcon className="w-6 h-6" />
+                                                            Edit Design
                                                         </button>
                                                         <button
                                                             onClick={() => handleDeleteQuiz(quiz.id)}
-                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Delete Quiz"
+                                                            className="p-3 text-red-100 hover:text-red-600 bg-red-50/10 hover:bg-red-50 rounded-xl transition-all"
                                                         >
-                                                            <TrashIcon className="w-6 h-6" />
+                                                            <TrashIcon className="w-5 h-5 stroke-[2.5]" />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -324,47 +332,68 @@ const TeacherCourseView = () => {
 
                         {activeTab === 'students' && (
                             <div>
-                                <h2 className="text-xl font-semibold text-gray-900 mb-6">Enrolled Students</h2>
+                                <div className="mb-8">
+                                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Enrolled Students</h2>
+                                    <p className="text-gray-500 font-medium">Manage all learners registered in this learning area</p>
+                                </div>
+
                                 {course.enrolled_students && course.enrolled_students.length > 0 ? (
-                                    <div className="overflow-x-auto">
+                                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                                         <table className="w-full">
-                                            <thead className="bg-gray-50 border-b border-gray-200">
-                                                <tr>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student ID</th>
-                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                            <thead>
+                                                <tr className="bg-gray-50 text-left">
+                                                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Full Name</th>
+                                                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Admission No</th>
+                                                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Parent Email</th>
+                                                    <th className="px-8 py-5 text-right"></th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-gray-200">
+                                            <tbody className="divide-y divide-gray-50">
                                                 {course.enrolled_students.map((student) => (
-                                                    <tr key={student.id} className="hover:bg-gray-50">
-                                                        <td className="px-6 py-4 text-sm text-gray-900">{student.name}</td>
-                                                        <td className="px-6 py-4 text-sm text-gray-600">{student.student_id}</td>
-                                                        <td className="px-6 py-4 text-sm text-gray-600">{student.email}</td>
+                                                    <tr key={student.id} className="hover:bg-blue-50/30 transition-colors group">
+                                                        <td className="px-8 py-5">
+                                                            <div className="flex items-center">
+                                                                <div className="w-10 h-10 bg-[#18216D]/5 text-[#18216D] rounded-xl flex items-center justify-center font-black mr-3 uppercase border border-[#18216D]/10">
+                                                                    {student.name?.substring(0, 2)}
+                                                                </div>
+                                                                <span className="text-sm font-black text-[#18216D]">{student.name}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-8 py-5 text-sm font-black text-gray-500">{student.student_id}</td>
+                                                        <td className="px-8 py-5 text-sm font-bold text-gray-400 tracking-tight">{student.email}</td>
+                                                        <td className="px-8 py-5 text-right">
+                                                            <button className="p-2 text-gray-300 hover:text-blue-600 transition-colors">
+                                                                <PencilSquareIcon className="w-5 h-5" />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="text-center py-12 text-gray-500">
-                                        <p>No students enrolled yet</p>
+                                    <div className="text-center py-24 bg-white rounded-3xl border-2 border-dashed border-gray-100 shadow-sm">
+                                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                                            <UsersIcon className="h-10 w-10 text-gray-300" />
+                                        </div>
+                                        <p className="text-gray-400 font-bold">No students are currently enrolled.</p>
                                     </div>
                                 )}
                             </div>
                         )}
 
-                        {activeTab === 'grades' && (
+                        {activeTab === 'gradebook' && (
                             <GradeBook courseId={id} />
                         )}
                     </div>
-                </div>
+                </main>
             </div>
 
-            {/* Quiz Builder Modal */}
+            {/* Modals */}
             {showQuizBuilder && (
                 <QuizBuilder
                     lessonId={selectedLessonForQuiz}
+                    courseId={id}
                     quiz={editingQuiz}
                     onClose={() => {
                         setShowQuizBuilder(false);
@@ -374,7 +403,6 @@ const TeacherCourseView = () => {
                 />
             )}
 
-            {/* Discussion Manager Modal */}
             {showDiscussionManager && (
                 <DiscussionManager
                     courseId={id}
@@ -385,7 +413,6 @@ const TeacherCourseView = () => {
                 />
             )}
 
-            {/* Schedule Manager Modal */}
             {showScheduleManager && (
                 <ScheduleManager
                     courseId={id}

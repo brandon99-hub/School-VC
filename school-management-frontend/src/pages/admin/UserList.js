@@ -29,7 +29,8 @@ const UserList = () => {
         const matchesSearch =
             user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.username?.toLowerCase().includes(searchTerm.toLowerCase());
+            user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.system_id?.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesRole = roleFilter === 'all' || user.role === roleFilter;
 
@@ -116,7 +117,9 @@ const UserList = () => {
                             <thead className="bg-slate-50/50 border-b border-gray-100">
                                 <tr>
                                     <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">User Profile</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">System ID</th>
                                     <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">System Role</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Grade / Dept</th>
                                     <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Account Status</th>
                                     <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Actions</th>
                                 </tr>
@@ -127,8 +130,8 @@ const UserList = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-4">
                                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm ${user.role === 'admin' ? 'bg-amber-100 text-amber-700' :
-                                                        user.role === 'teacher' ? 'bg-purple-100 text-purple-700' :
-                                                            'bg-indigo-100 text-indigo-700'
+                                                    user.role === 'teacher' ? 'bg-purple-100 text-purple-700' :
+                                                        'bg-indigo-100 text-indigo-700'
                                                     }`}>
                                                     {user.name?.charAt(0) || user.username?.charAt(0)}
                                                 </div>
@@ -139,18 +142,32 @@ const UserList = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
+                                            <span className="text-xs font-mono font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                                                {user.system_id || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
                                                 <span className={`p-1.5 rounded-lg text-xs ${user.role === 'admin' ? 'bg-amber-50 text-amber-600' :
-                                                        user.role === 'teacher' ? 'bg-purple-50 text-purple-600' :
-                                                            'bg-sky-50 text-sky-600'
+                                                    user.role === 'teacher' ? 'bg-purple-50 text-purple-600' :
+                                                        'bg-sky-50 text-sky-600'
                                                     }`}>
                                                     <i className={`fas ${user.role === 'admin' ? 'fa-shield-halved' :
-                                                            user.role === 'teacher' ? 'fa-chalkboard-user' :
-                                                                'fa-user-graduate'
+                                                        user.role === 'teacher' ? 'fa-chalkboard-user' :
+                                                            'fa-user-graduate'
                                                         } w-4 text-center`}></i>
                                                 </span>
                                                 <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{user.role}</span>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {user.role === 'student' ? (
+                                                <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-black uppercase tracking-widest">
+                                                    {user.grade_level || 'No Grade'}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 italic">Faculty</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`inline-flex px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'

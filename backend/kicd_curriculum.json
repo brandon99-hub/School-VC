@@ -1,0 +1,172 @@
+[
+    {
+        "grade_level": "Grade 1",
+        "curriculum_type": "CBC",
+        "order": 1,
+        "learning_areas": [
+            {
+                "name": "Mathematics",
+                "code": "MATH-G1",
+                "strands": [
+                    {
+                        "name": "Numbers",
+                        "code": "MATH-G1-NUM",
+                        "order": 1,
+                        "sub_strands": [
+                            {
+                                "name": "Whole Numbers",
+                                "code": "MATH-G1-NUM-WHOLE",
+                                "order": 1,
+                                "outcomes": [
+                                    {
+                                        "code": "MATH-G1-NUM-WHOLE-01",
+                                        "description": "Count numbers up to 100",
+                                        "order": 1
+                                    },
+                                    {
+                                        "code": "MATH-G1-NUM-WHOLE-02",
+                                        "description": "Read and write numbers 1-10 in words",
+                                        "order": 2
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "English Language",
+                "code": "ENG-G1"
+            },
+            {
+                "name": "Kiswahili Language",
+                "code": "KIS-G1"
+            },
+            {
+                "name": "Environmental Activities",
+                "code": "ENV-G1"
+            },
+            {
+                "name": "Creative Activities",
+                "code": "CREA-G1"
+            },
+            {
+                "name": "Religious Education",
+                "code": "RE-G1"
+            }
+        ]
+    },
+    {
+        "grade_level": "Grade 4",
+        "curriculum_type": "CBC",
+        "order": 4,
+        "learning_areas": [
+            {
+                "name": "Mathematics",
+                "code": "MATH-G4",
+                "strands": [
+                    {
+                        "name": "Numbers",
+                        "code": "MATH-G4-NUM",
+                        "order": 1,
+                        "sub_strands": [
+                            {
+                                "name": "Whole Numbers",
+                                "code": "MATH-G4-NUM-WHOLE",
+                                "order": 1,
+                                "outcomes": [
+                                    {
+                                        "code": "MATH-G4-NUM-WHOLE-01",
+                                        "description": "Use place value and total value of digits up to 10,000",
+                                        "order": 1
+                                    },
+                                    {
+                                        "code": "MATH-G4-NUM-WHOLE-02",
+                                        "description": "Read and write numbers up to 10,000 in symbols",
+                                        "order": 2
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Measurement",
+                        "code": "MATH-G4-MEAS",
+                        "order": 2
+                    },
+                    {
+                        "name": "Geometry",
+                        "code": "MATH-G4-GEOM",
+                        "order": 3
+                    }
+                ]
+            },
+            {
+                "name": "Science and Technology",
+                "code": "SCI-G4"
+            },
+            {
+                "name": "Agriculture and Nutrition",
+                "code": "AGRI-G4"
+            },
+            {
+                "name": "Social Studies",
+                "code": "SOC-G4"
+            },
+            {
+                "name": "Creative Arts",
+                "code": "ARTS-G4"
+            }
+        ]
+    },
+    {
+        "grade_level": "Grade 7",
+        "curriculum_type": "CBC",
+        "order": 7,
+        "learning_areas": [
+            {
+                "name": "Mathematics",
+                "code": "MATH-G7"
+            },
+            {
+                "name": "English",
+                "code": "ENG-G7"
+            },
+            {
+                "name": "Integrated Science",
+                "code": "INT-SCI-G7"
+            },
+            {
+                "name": "Pre-Technical Studies",
+                "code": "PRE-TECH-G7"
+            },
+            {
+                "name": "Agriculture and Nutrition",
+                "code": "AGRI-G7"
+            },
+            {
+                "name": "Creative Arts and Sports",
+                "code": "ARTS-G7"
+            }
+        ]
+    },
+    {
+        "grade_level": "Grade 10",
+        "curriculum_type": "CBC",
+        "order": 10,
+        "learning_areas": [
+            {
+                "name": "Pure Sciences",
+                "code": "SCI-G10"
+            },
+            {
+                "name": "Applied Sciences",
+                "code": "APP-SCI-G10"
+            },
+            {
+                "name": "Arts and Sports",
+                "code": "ARTS-G10"
+            }
+        ]
+    }
+]

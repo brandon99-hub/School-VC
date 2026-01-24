@@ -313,6 +313,13 @@ class CourseViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        queryset = Course.objects.all()
+        grade_level = self.request.query_params.get('grade_level')
+        if grade_level:
+            queryset = queryset.filter(learning_area__grade_level_id=grade_level)
+        return queryset
+
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def enroll(self, request, pk=None):
         course = self.get_object()
@@ -434,6 +441,13 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
+    @action(detail=True, methods=['get'])
+    def submissions(self, request, pk=None):
+        assignment = self.get_object()
+        submissions = assignment.submissions.all()
+        serializer = AssignmentSubmissionSerializer(submissions, many=True)
+        return Response(serializer.data)
+
 
 
 class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
@@ -491,76 +505,172 @@ class DiscussionCommentViewSet(viewsets.ModelViewSet):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def course_detail_api(request, pk):
+    from cbc.models import LearningArea
+    from teachers.serializers import AssignmentSerializer as TeacherAssignmentSerializer
+    
     student_user = request.user if isinstance(request.user, Student) else getattr(request.user, 'student', None)
+    
     try:
-        course = Course.objects.prefetch_related(
-            'modules__lessons__contents',
-            'modules__lessons__quizzes__questions',
-            'discussion_threads__comments__author',
-            'assignment_set__submissions',
-        ).get(pk=pk)
+        # 1. Try traditional Course first
+        try:
+            course = Course.objects.prefetch_related(
+                'modules__lessons__contents',
+                'modules__lessons__quizzes__questions',
+                'discussion_threads__comments__author',
+                'assignment_set__submissions',
+            ).get(pk=pk)
 
-        has_permission = False
-        if request.user.is_superuser or hasattr(request.user, 'teacher'):
-            has_permission = True
-        elif student_user:
-            has_permission = course in student_user.get_enrolled_courses()
+            has_permission = False
+            if request.user.is_superuser or hasattr(request.user, 'teacher'):
+                has_permission = True
+            elif student_user:
+                has_permission = course in student_user.get_enrolled_courses()
 
-        if not has_permission:
-            return Response(
-                {"error": "You don't have permission to view this course."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            if not has_permission:
+                return Response(
+                    {"error": "You don't have permission to view this course."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        serializer = CourseDetailSerializer(course)
-        data = serializer.data
+            serializer = CourseDetailSerializer(course)
+            data = serializer.data
 
-        schedules = course.schedule_set.all()
-        data['schedules'] = [
-            {
-                'id': schedule.id,
-                'day': schedule.day,
-                'start_time': schedule.start_time,
-                'end_time': schedule.end_time,
-                'meeting_link': schedule.meeting_link,
-                'recording_link': schedule.recording_link
+            schedules = course.schedule_set.all()
+            data['schedules'] = [
+                {
+                    'id': schedule.id,
+                    'day': schedule.day,
+                    'start_time': schedule.start_time,
+                    'end_time': schedule.end_time,
+                    'meeting_link': schedule.meeting_link,
+                    'recording_link': schedule.recording_link
+                }
+                for schedule in schedules
+            ]
+
+            if student_user:
+                assignment_submissions = AssignmentSubmission.objects.filter(
+                    assignment__course=course,
+                    student=student_user
+                )
+                quiz_submissions = QuizSubmission.objects.filter(
+                    quiz__lesson__module__course=course,
+                    student=student_user
+                )
+                completed_quizzes = quiz_submissions.values('quiz_id').distinct().count()
+                published_lessons = Lesson.objects.filter(module__course=course, is_published=True).count()
+
+                data['student_submissions'] = {
+                    'assignments': AssignmentSubmissionSerializer(assignment_submissions, many=True).data,
+                    'quizzes': QuizSubmissionSerializer(quiz_submissions, many=True).data,
+                }
+                data['student_progress'] = {
+                    'completed_quizzes': completed_quizzes,
+                    'attempted_quizzes': quiz_submissions.count(),
+                    'published_lessons': published_lessons,
+                }
+
+            return Response(data)
+
+        except Course.DoesNotExist:
+            # 2. Fallback to CBC LearningArea
+            area = LearningArea.objects.prefetch_related(
+                'strands__sub_strands__learning_outcomes',
+                'assignments',
+                'students'
+            ).get(pk=pk)
+
+            has_permission = False
+            if request.user.is_superuser or hasattr(request.user, 'teacher'):
+                has_permission = True
+            else:
+                has_permission = area.students.filter(id=request.user.id).exists()
+
+            if not has_permission:
+                return Response(
+                    {"error": "You don't have permission to view this Learning Area."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Map LearningArea to CourseDetail expected structure
+            data = {
+                'id': area.id,
+                'name': area.name,
+                'code': area.code,
+                'description': area.description,
+                'teacher_name': area.teacher.user.get_full_name() if area.teacher else "Departmental Teacher",
+                'grade_level_name': area.grade_level.name,
+                'is_active': area.is_active,
+                'modules': [],
+                'assignments': TeacherAssignmentSerializer(area.assignments.all(), many=True).data,
+                'schedules': [], # CBC schedule handled differently or TBD
+                'discussion_threads': [],
+                'student_submissions': {'assignments': [], 'quizzes': []},
+                'student_progress': {'completed_quizzes': 0, 'attempted_quizzes': 0, 'published_lessons': 0},
+                'learning_summary': {
+                    'total_lessons': 0,
+                    'published_lessons': 0,
+                    'quiz_count': 0
+                }
             }
-            for schedule in schedules
-        ]
 
-        if student_user:
-            assignment_submissions = AssignmentSubmission.objects.filter(
-                assignment__course=course,
-                student=student_user
-            )
-            quiz_submissions = QuizSubmission.objects.filter(
-                quiz__lesson__module__course=course,
-                student=student_user
-            )
-            completed_quizzes = quiz_submissions.values('quiz_id').distinct().count()
-            published_lessons = Lesson.objects.filter(module__course=course, is_published=True).count()
+            # Map Strands -> Modules and Sub-strands -> Lessons
+            total_lessons = 0
+            for strand in area.strands.all().order_by('order'):
+                module = {
+                    'id': strand.id,
+                    'title': strand.name,
+                    'description': strand.description,
+                    'order': strand.order,
+                    'lessons': []
+                }
+                
+                for sub in strand.sub_strands.all().order_by('order'):
+                    total_lessons += 1
+                    lesson = {
+                        'id': sub.id,
+                        'title': sub.name,
+                        'summary': sub.description,
+                        'order': sub.order,
+                        'duration_minutes': 40, # Default CBC period
+                        'contents': [
+                            {
+                                'id': outcome.id,
+                                'title': outcome.code,
+                                'body': outcome.description,
+                                'content_type': 'document'
+                            }
+                            for outcome in sub.learning_outcomes.all().order_by('order')
+                        ],
+                        'quizzes': []
+                    }
+                    module['lessons'].append(lesson)
+                
+                data['modules'].append(module)
 
-            data['student_submissions'] = {
-                'assignments': AssignmentSubmissionSerializer(assignment_submissions, many=True).data,
-                'quizzes': QuizSubmissionSerializer(quiz_submissions, many=True).data,
-            }
-            data['student_progress'] = {
-                'completed_quizzes': completed_quizzes,
-                'attempted_quizzes': quiz_submissions.count(),
-                'published_lessons': published_lessons,
-            }
+            data['learning_summary']['total_lessons'] = total_lessons
+            data['learning_summary']['published_lessons'] = total_lessons # CBC registry assumed published
+            
+            # Fetch user submissions for this learning area
+            if not request.user.is_superuser and not hasattr(request.user, 'teacher'):
+                sub_data = AssignmentSubmission.objects.filter(
+                    assignment__learning_area=area,
+                    student=request.user
+                )
+                data['student_submissions']['assignments'] = AssignmentSubmissionSerializer(sub_data, many=True).data
 
-        return Response(data)
+            return Response(data)
 
-    except Course.DoesNotExist:
+    except (Course.DoesNotExist, LearningArea.DoesNotExist):
         return Response(
-            {"error": "Course not found."},
+            {"error": "Learning Area not found."},
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
-        print(f"Error in course_detail_api: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response(
-            {"error": "An unexpected error occurred."},
+            {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

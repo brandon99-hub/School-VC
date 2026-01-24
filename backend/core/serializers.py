@@ -102,6 +102,7 @@ class UserSerializer(serializers.ModelSerializer):
             'address',
             'phone',
             'grade',
+            'grade_level',
             'is_superuser',
             'is_staff'
         ]

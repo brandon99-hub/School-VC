@@ -12,14 +12,14 @@ import {
 } from '@heroicons/react/24/outline';
 
 const StatCard = ({ label, value, icon: Icon, badge }) => (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
-        <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-            <Icon className="h-6 w-6" />
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex items-center gap-5 hover:shadow-md transition-shadow">
+        <div className="h-14 w-14 rounded-2xl bg-[#18216D]/5 text-[#18216D] flex items-center justify-center">
+            <Icon className="h-7 w-7" />
         </div>
         <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{label}</p>
-            <p className="text-2xl font-semibold text-gray-900">{value}</p>
-            {badge && <p className="text-sm text-gray-500">{badge}</p>}
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black">{label}</p>
+            <p className="text-3xl font-black text-[#18216D] leading-none mt-1">{value}</p>
+            {badge && <p className="text-[10px] font-bold text-[#FFC425] bg-[#FFC425]/10 px-2 py-0.5 rounded-lg mt-2 inline-block uppercase tracking-tighter">{badge}</p>}
         </div>
     </div>
 );
@@ -41,7 +41,7 @@ const TeacherDashboard = () => {
             )
             : 0;
         return {
-            courses: courses.length,
+            learningAreas: courses.length,
             students: totalStudents,
             assignments: totalAssignments,
             attendance: avgAttendance,
@@ -66,16 +66,16 @@ const TeacherDashboard = () => {
     return (
         <div className="min-h-screen bg-slate-50">
             <main className="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-10">
-                <header className="space-y-2">
-                    <p className="text-sm uppercase tracking-wide text-indigo-500 font-semibold">Teacher dashboard</p>
-                    <h1 className="text-3xl sm:text-4xl font-bold text-slate-900">Good to see you, {fullName}</h1>
-                    <p className="text-slate-500 max-w-2xl">
-                        Keep track of class performance, assignments, and attendance in one place.
-                    </p>
+                <header className="relative overflow-hidden bg-[#18216D] rounded-[2.5rem] p-12 text-white shadow-2xl shadow-indigo-900/20">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFC425]/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                    <div className="relative z-10">
+                        <h1 className="text-4xl sm:text-6xl font-black tracking-tighter">Welcome back, {user?.first_name || 'Teacher'}</h1>
+                        <div className="h-2 w-24 bg-[#FFC425] rounded-full mt-6"></div>
+                    </div>
                 </header>
 
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard label="Courses" value={overview.courses} icon={AcademicCapIcon} />
+                    <StatCard label="Assigned Standards" value={overview.learningAreas} icon={AcademicCapIcon} />
                     <StatCard label="Students" value={overview.students} icon={UserGroupIcon} />
                     <StatCard
                         label="Assignments"
@@ -90,19 +90,19 @@ const TeacherDashboard = () => {
                     <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Courses</p>
-                                <h2 className="text-xl font-semibold text-gray-900">Active classes</h2>
+                                <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">National Standards</p>
+                                <h2 className="text-xl font-semibold text-gray-900">Assigned Learning Areas</h2>
                             </div>
                             <button
                                 onClick={handleRefresh}
-                                className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+                                className="text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:text-[#FFC425] transition-colors"
                             >
-                                Refresh
+                                Sync Data
                             </button>
                         </div>
                         {courses.length === 0 ? (
-                            <div className="p-6 text-gray-500 text-sm">
-                                No courses found. Use the admin panel to assign classes.
+                            <div className="p-6 text-gray-500 text-sm italic">
+                                No national standards assigned yet. Please contact administration to link your profile to your Learning Areas.
                             </div>
                         ) : (
                             <div className="p-6 space-y-4">
@@ -110,17 +110,17 @@ const TeacherDashboard = () => {
                                     <Link
                                         key={course.id}
                                         to={`/teacher/courses/${course.id}`}
-                                        className="block border border-gray-100 rounded-xl p-4 hover:border-indigo-200 hover:bg-slate-50 transition no-underline"
+                                        className="block border border-slate-100 rounded-[2rem] p-6 hover:border-[#FFC425] hover:bg-white hover:shadow-xl hover:shadow-indigo-900/5 transition-all no-underline group"
                                     >
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-sm uppercase tracking-wide text-gray-400">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFC425]">
                                                     {course.code}
                                                 </p>
-                                                <h3 className="text-lg font-semibold text-gray-900">{course.name}</h3>
+                                                <h3 className="text-xl font-black text-[#18216D] group-hover:translate-x-1 transition-transform">{course.name}</h3>
                                             </div>
-                                            <span className="text-sm text-gray-500">
-                                                {course.enrolled_students_count || 0} students
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                                                {course.enrolled_students_count || 0} Scholars
                                             </span>
                                         </div>
                                         <div className="mt-4 grid gap-3">
@@ -143,15 +143,15 @@ const TeacherDashboard = () => {
                                                             e.stopPropagation();
                                                             setSelectedAssignment(assignment.id);
                                                         }}
-                                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                                                        className="text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:text-[#FFC425] transition-all"
                                                     >
-                                                        Grade
+                                                        Grade Task
                                                     </button>
                                                 </div>
                                             ))}
                                             {(!course.assignments || !course.assignments.length) && (
                                                 <p className="text-sm text-gray-400">
-                                                    No assignments configured for this course.
+                                                    No assignments configured for this learning area.
                                                 </p>
                                             )}
                                         </div>
@@ -166,12 +166,12 @@ const TeacherDashboard = () => {
                     <TeacherAttendanceRecord />
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-gray-900 flex items-center">
-                                <i className="fas fa-tasks mr-2 text-indigo-500"></i>
-                                Pending Submissions
+                            <h3 className="text-xl font-black text-[#18216D] flex items-center uppercase tracking-tight">
+                                <i className="fas fa-tasks mr-3 text-[#FFC425]"></i>
+                                Pending Action
                             </h3>
-                            <Link to="/teacher/courses" className="text-xs font-bold text-indigo-600 uppercase tracking-widest hover:text-indigo-700">
-                                View All
+                            <Link to="/teacher/courses" className="text-[10px] font-black text-[#18216D] uppercase tracking-[0.2em] hover:text-[#FFC425] transition-colors">
+                                View Registry
                             </Link>
                         </div>
                         <div className="space-y-4">
@@ -189,7 +189,7 @@ const TeacherDashboard = () => {
                                             </div>
                                             <button
                                                 onClick={() => setSelectedAssignment(assignment.id)}
-                                                className="px-3 py-1.5 bg-white text-indigo-600 text-xs font-bold rounded-lg border border-indigo-50 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all uppercase tracking-tight"
+                                                className="px-4 py-2 bg-white text-[#18216D] text-[10px] font-black rounded-xl border border-slate-100 shadow-sm group-hover:bg-[#18216D] group-hover:text-white transition-all uppercase tracking-widest"
                                             >
                                                 Grade ({assignment.submission_count || 0})
                                             </button>

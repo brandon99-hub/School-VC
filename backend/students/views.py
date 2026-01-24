@@ -18,26 +18,25 @@ from rest_framework.response import Response
 def student_courses_api(request, student_id):
     try:
         # First check if student exists
-        try:
-            student = Student.objects.get(id=student_id)
-        except Student.DoesNotExist:
-            return Response({'detail': 'Student not found'}, status=404)
+        student = get_object_or_404(Student, id=student_id)
         
-        # Get courses and check if any exist
-        courses = student.get_enrolled_courses()
-        if not courses.exists():
-            return Response([], status=200)  # Return empty list instead of error
-            
-        # Serialize the courses
-        try:
-            serializer = CourseSerializer(courses, many=True)
+        # 1. Try CBC Learning Areas first (always check if they have any)
+        cbc_learning_areas = student.learning_areas.filter(is_active=True)
+        if cbc_learning_areas.exists():
+            from teachers.serializers import LearningAreaSerializer
+            serializer = LearningAreaSerializer(cbc_learning_areas, many=True)
             return Response(serializer.data)
-        except Exception as e:
-            print(f"Error serializing courses: {str(e)}")  # Add logging
-            return Response({
-                'detail': f'Error serializing courses: {str(e)}',
-                'error_type': type(e).__name__
-            }, status=500)
+            
+        # 2. Check if student is in a CBC Grade Level (for automatic enrollment logic)
+        if student.grade_level and student.grade_level.is_cbc:
+            # Re-fetch just in case, though handled above
+            serializer = LearningAreaSerializer(cbc_learning_areas, many=True)
+            return Response(serializer.data)
+        
+        # 3. Fallback to legacy courses
+        courses = student.get_enrolled_courses()
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data)
             
     except Exception as e:
         print(f"Unexpected error in student_courses_api: {str(e)}")  # Add logging

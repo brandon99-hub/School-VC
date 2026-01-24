@@ -37,6 +37,15 @@ class AttendanceSerializer(serializers.ModelSerializer):
 
 class AssignmentSerializer(serializers.ModelSerializer):
     submission_count = serializers.SerializerMethodField()
+    # CBC fields
+    learning_area_name = serializers.CharField(source='learning_area.name', read_only=True)
+    learning_outcome_description = serializers.CharField(source='learning_outcome.description', read_only=True)
+    learning_outcome_code = serializers.CharField(source='learning_outcome.code', read_only=True)
+    strand_name = serializers.CharField(source='learning_outcome.sub_strand.strand.name', read_only=True)
+    sub_strand_name = serializers.CharField(source='learning_outcome.sub_strand.name', read_only=True)
+    strand_id = serializers.IntegerField(source='learning_outcome.sub_strand.strand.id', read_only=True)
+    sub_strand_id = serializers.IntegerField(source='learning_outcome.sub_strand.id', read_only=True)
+    is_cbc_assignment = serializers.BooleanField(source='is_cbc', read_only=True)
     
     class Meta:
         model = Assignment
@@ -50,12 +59,22 @@ class AssignmentSerializer(serializers.ModelSerializer):
 
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    student_id = serializers.CharField(source='student.student_id', read_only=True)
     assignment_title = serializers.CharField(source='assignment.title', read_only=True)
+    # CBC fields
+    is_cbc_graded = serializers.BooleanField(read_only=True)
+    competency_level_display = serializers.SerializerMethodField()
 
     class Meta:
         model = AssignmentSubmission
         fields = '__all__'
         read_only_fields = ('student',)
+    
+    def get_competency_level_display(self, obj):
+        """Get full display name for competency level"""
+        if obj.competency_level:
+            return dict(AssignmentSubmission.COMPETENCY_LEVELS).get(obj.competency_level)
+        return None
 
 
 class ScheduleSerializer(serializers.ModelSerializer):
@@ -99,6 +118,7 @@ class QuizSerializer(serializers.ModelSerializer):
 
 class QuizSubmissionSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    student_id = serializers.CharField(source='student.student_id', read_only=True)
     quiz_title = serializers.CharField(source='quiz.title', read_only=True)
     responses = QuizResponseSerializer(many=True, read_only=True)
 
@@ -176,11 +196,17 @@ class CourseDetailSerializer(CourseSerializer):
         return DiscussionThreadSerializer(threads, many=True).data
 
     def get_assignment_submissions(self, obj):
+        request = self.context.get('request')
         submissions = AssignmentSubmission.objects.filter(assignment__course=obj).select_related('student')
+        if request and hasattr(request.user, 'student'):
+            submissions = submissions.filter(student=request.user.student)
         return AssignmentSubmissionSerializer(submissions, many=True).data
 
     def get_quiz_submissions(self, obj):
+        request = self.context.get('request')
         submissions = QuizSubmission.objects.filter(quiz__lesson__module__course=obj).select_related('student')
+        if request and hasattr(request.user, 'student'):
+            submissions = submissions.filter(student=request.user.student)
         return QuizSubmissionSerializer(submissions, many=True).data
 
     def get_learning_summary(self, obj):

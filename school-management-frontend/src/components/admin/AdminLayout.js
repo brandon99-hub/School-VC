@@ -16,7 +16,8 @@ const AdminLayout = ({ children }) => {
 
     const navItems = [
         { path: '/admin', label: 'Dashboard', icon: 'fa-gauge-high' },
-        { path: '/admin/courses', label: 'Courses', icon: 'fa-book' },
+        { path: '/admin/courses', label: 'Learning Areas', icon: 'fa-book' },
+        { path: '/admin/curriculum', label: 'Curriculum', icon: 'fa-sitemap' },
         { path: '/admin/users', label: 'Users', icon: 'fa-users-gear' },
     ];
 

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from courses.models import Course, Assignment
 from students.models import Student
-
+from cbc.models import LearningArea
 
 class AssignmentSerializer(serializers.ModelSerializer):
     """Serializer for Assignment model with essential fields"""
@@ -22,18 +22,43 @@ class EnrolledStudentSerializer(serializers.ModelSerializer):
         return f"{obj.first_name} {obj.last_name}".strip()
 
 
+class LearningAreaSerializer(serializers.ModelSerializer):
+    """Serializer for CBC Learning Areas mapped to frontend expectations"""
+    enrolled_students_count = serializers.IntegerField(source='get_enrolled_students_count', read_only=True)
+    enrolled_students = EnrolledStudentSerializer(many=True, read_only=True, source='students')
+    assignments = AssignmentSerializer(many=True, read_only=True)
+    modules = serializers.SerializerMethodField()
+    grade_level_name = serializers.CharField(source='grade_level.name', read_only=True)
+    teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
+    teacher = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
+    progress = serializers.IntegerField(default=0, read_only=True)
+    
+    class Meta:
+        model = LearningArea
+        fields = [
+            'id', 'name', 'code', 'is_active', 'grade_level_name', 'teacher_name', 'teacher',
+            'enrolled_students_count', 'enrolled_students', 'assignments', 'modules', 'progress'
+        ]
+    
+    def get_modules(self, obj):
+        # Map Strands to "Modules" for frontend compatibility
+        from cbc.serializers import StrandDetailSerializer
+        strands = obj.strands.all().order_by('order')
+        return StrandDetailSerializer(strands, many=True).data
+
 class CourseSerializer(serializers.ModelSerializer):
     """Enhanced course serializer with nested student and assignment data"""
     enrolled_students_count = serializers.SerializerMethodField()
     enrolled_students = EnrolledStudentSerializer(many=True, read_only=True, source='students')
     assignments = serializers.SerializerMethodField()
     modules = serializers.SerializerMethodField()
+    grade_level_name = serializers.CharField(source='learning_area.grade_level.name', read_only=True)
     
     class Meta:
         model = Course
         fields = [
             'id', 'name', 'code', 'start_date', 'end_date', 'is_active', 'credits', 'semester',
-            'enrolled_students_count', 'enrolled_students', 'assignments', 'modules'
+            'learning_area', 'grade_level_name', 'enrolled_students_count', 'enrolled_students', 'assignments', 'modules'
         ]
     
     def get_enrolled_students_count(self, obj):

@@ -4,21 +4,25 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import CourseList from './CourseList';
 import CourseForm from './CourseForm';
 import UserList from './UserList';
+import FinanceOverview from '../../components/admin/FinanceOverview';
+import FeeManagement from './FeeManagement';
+import PaymentRecording from './PaymentRecording';
+import CurriculumRegistry from './CurriculumRegistry';
 import { useApi } from '../../hooks/useApi';
 
 const StatCard = ({ title, value, icon, color, link }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 hover:shadow-lg transition-all group">
         <div className="flex items-center justify-between">
             <div>
-                <p className="text-sm font-medium text-gray-600">{title}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{title}</p>
+                <p className="text-4xl font-black text-[#18216D] mt-2 group-hover:scale-105 transition-transform origin-left">{value}</p>
                 {link && (
-                    <Link to={link} className="text-sm text-blue-600 hover:text-blue-800 mt-2 inline-block">
-                        View all →
+                    <Link to={link} className="text-[10px] font-black text-[#FFC425] uppercase tracking-widest mt-4 inline-block hover:text-[#18216D] transition-colors">
+                        Explore Data →
                     </Link>
                 )}
             </div>
-            <div className={`text-4xl ${color}`}>
+            <div className={`w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center text-3xl ${color} shadow-inner`}>
                 {icon}
             </div>
         </div>
@@ -29,8 +33,8 @@ const StatCard = ({ title, value, icon, color, link }) => (
 const Dashboard = () => {
     const { get } = useApi();
     const [stats, setStats] = useState({
-        totalCourses: 0,
-        activeCourses: 0,
+        totalLearningAreas: 0,
+        activeLearningAreas: 0,
         totalTeachers: 0,
         totalStudents: 0,
     });
@@ -40,7 +44,13 @@ const Dashboard = () => {
         const fetchStats = async () => {
             try {
                 const data = await get('/api/admin/stats/');
-                setStats(data);
+                // Map legacy backend stats to new terminology
+                setStats({
+                    totalLearningAreas: data.totalLearningAreas,
+                    totalStrands: data.totalStrands,
+                    totalTeachers: data.totalTeachers,
+                    totalStudents: data.totalStudents
+                });
             } catch (error) {
                 console.error('Error fetching stats:', error);
             } finally {
@@ -62,39 +72,42 @@ const Dashboard = () => {
     return (
         <div className="space-y-8">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-                <p className="text-gray-600 mt-2">Welcome back! Here's an overview of your system.</p>
-            </div>
+            <header className="relative bg-[#18216D] rounded-[2rem] p-10 text-white shadow-xl shadow-indigo-900/10 overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FFC425]/10 rounded-full -mr-24 -mt-24 blur-2xl"></div>
+                <div className="relative z-10">
+                    <h1 className="text-4xl font-black tracking-tighter uppercase">Administrative Hub</h1>
+                    <p className="text-indigo-100/70 mt-2 font-medium">Kianda School Excellence: Global system oversight and curriculum governance.</p>
+                </div>
+            </header>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
-                    title="Total Courses"
-                    value={stats.totalCourses}
+                    title="National Learning Areas"
+                    value={stats.totalLearningAreas}
                     icon={<i className="fas fa-book-open"></i>}
-                    color="text-blue-500"
-                    link="/admin/courses"
+                    color="text-[#18216D]"
+                    link="/admin/curriculum"
                 />
                 <StatCard
-                    title="Active Courses"
-                    value={stats.activeCourses}
-                    icon={<i className="fas fa-circle-check"></i>}
-                    color="text-green-500"
-                    link="/admin/courses"
+                    title="Curriculum Strands"
+                    value={stats.totalStrands}
+                    icon={<i className="fas fa-layer-group"></i>}
+                    color="text-[#FFC425]"
+                    link="/admin/curriculum"
                 />
                 <StatCard
-                    title="Teachers"
+                    title="Faculty Experts"
                     value={stats.totalTeachers}
                     icon={<i className="fas fa-chalkboard-user"></i>}
-                    color="text-purple-500"
+                    color="text-indigo-400"
                     link="/admin/users"
                 />
                 <StatCard
-                    title="Students"
+                    title="Enrolled Scholars"
                     value={stats.totalStudents}
                     icon={<i className="fas fa-user-graduate"></i>}
-                    color="text-orange-500"
+                    color="text-slate-400"
                     link="/admin/users"
                 />
             </div>
@@ -104,15 +117,15 @@ const Dashboard = () => {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <Link
-                        to="/admin/courses/new"
+                        to="/admin/curriculum"
                         className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group shadow-sm bg-slate-50/50"
                     >
                         <span className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
-                            <i className="fas fa-plus"></i>
+                            <i className="fas fa-sitemap"></i>
                         </span>
                         <div>
-                            <p className="font-bold text-gray-900 group-hover:text-blue-700">Add Course</p>
-                            <p className="text-xs text-gray-500">Create a new course</p>
+                            <p className="font-bold text-gray-900 group-hover:text-blue-700">Open Registry</p>
+                            <p className="text-xs text-gray-500">Manage KICD subjects</p>
                         </div>
                     </Link>
                     <Link
@@ -135,15 +148,18 @@ const Dashboard = () => {
                             <i className="fas fa-list-check"></i>
                         </span>
                         <div>
-                            <p className="font-bold text-gray-900 group-hover:text-green-700">View Courses</p>
-                            <p className="text-xs text-gray-500">Browse all courses</p>
+                            <p className="font-bold text-gray-900 group-hover:text-green-700">Learning Areas</p>
+                            <p className="text-xs text-gray-500">Browse all subjects</p>
                         </div>
                     </Link>
                 </div>
             </div>
 
+            {/* Finance Overview */}
+            <FinanceOverview />
+
             {/* Recent Activity (Placeholder) */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
                 <div className="text-center py-8 text-gray-500">
                     <p>No recent activity to display</p>
@@ -164,6 +180,9 @@ const AdminDashboard = () => {
                 <Route path="/courses/new" element={<CourseForm />} />
                 <Route path="/courses/:id/edit" element={<CourseForm />} />
                 <Route path="/users" element={<UserList />} />
+                <Route path="/finance" element={<FeeManagement />} />
+                <Route path="/finance/record-payment" element={<PaymentRecording />} />
+                <Route path="/curriculum" element={<CurriculumRegistry />} />
             </Routes>
         </AdminLayout>
     );

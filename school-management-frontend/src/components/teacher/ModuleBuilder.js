@@ -61,7 +61,7 @@ const ModuleBuilder = ({ courseId, module, onClose, onSave }) => {
             const payload = {
                 ...formData,
                 release_date: formData.release_date || null,
-                course: courseId,
+                learning_area: courseId,
             };
 
             if (isEditMode) {
@@ -89,40 +89,40 @@ const ModuleBuilder = ({ courseId, module, onClose, onSave }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        {isEditMode ? 'Edit Module' : 'Create New Module'}
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-[#18216D] text-white">
+                    <h2 className="text-xl font-black uppercase tracking-tight">
+                        {isEditMode ? 'Edit Strand' : 'Create New Strand'}
                     </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-8 space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Module Title *
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
+                            Strand Title <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
                             name="title"
                             value={formData.title}
                             onChange={handleChange}
-                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.title ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-5 py-3 border rounded-xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold ${errors.title ? 'border-red-500' : 'border-gray-200 focus:border-blue-500'
                                 }`}
-                            placeholder="e.g., Week 1: Introduction to Python"
+                            placeholder="e.g., Numbers & Operations"
                         />
-                        {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+                        {errors.title && <p className="text-red-500 text-xs mt-2 font-bold">{errors.title}</p>}
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
                             Description
                         </label>
                         <textarea
@@ -130,15 +130,15 @@ const ModuleBuilder = ({ courseId, module, onClose, onSave }) => {
                             value={formData.description}
                             onChange={handleChange}
                             rows="4"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Describe what students will learn in this module..."
+                            className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-medium leading-relaxed"
+                            placeholder="Describe the broad theme of this strand..."
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Order (Position in course)
+                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
+                                Order In Learning Area
                             </label>
                             <input
                                 type="number"
@@ -146,59 +146,56 @@ const ModuleBuilder = ({ courseId, module, onClose, onSave }) => {
                                 value={formData.order}
                                 onChange={handleChange}
                                 min="1"
-                                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.order ? 'border-red-500' : 'border-gray-300'
+                                className={`w-full px-5 py-3 border rounded-xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold ${errors.order ? 'border-red-500' : 'border-gray-200 focus:border-blue-500'
                                     }`}
                             />
-                            {errors.order && <p className="text-red-500 text-sm mt-1">{errors.order}</p>}
+                            {errors.order && <p className="text-red-500 text-xs mt-2 font-bold">{errors.order}</p>}
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Release Date (Optional)
+                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">
+                                Planned Start (Optional)
                             </label>
                             <input
                                 type="date"
                                 name="release_date"
                                 value={formData.release_date}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 transition-all outline-none font-bold"
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="flex items-center space-x-2">
+                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                        <label className="flex items-center space-x-3 cursor-pointer group">
                             <input
                                 type="checkbox"
                                 name="is_published"
                                 checked={formData.is_published}
                                 onChange={handleChange}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500 transition-all"
                             />
-                            <span className="text-sm font-medium text-gray-700">
-                                Published (visible to students)
+                            <span className="text-sm font-bold text-gray-700 group-hover:text-blue-700 transition-colors">
+                                Publish Strand immediately
                             </span>
                         </label>
-                        <p className="text-xs text-gray-500 mt-1 ml-6">
-                            Unpublished modules are only visible to you
-                        </p>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-100">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                            className="px-6 py-3 border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all font-bold"
                         >
-                            Cancel
+                            Discard
                         </button>
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-8 py-3 bg-[#18216D] text-white rounded-xl hover:bg-[#0D164F] transition-all font-extrabold shadow-lg shadow-indigo-900/20 disabled:opacity-50"
                         >
-                            {submitting ? 'Saving...' : (isEditMode ? 'Update Module' : 'Create Module')}
+                            {submitting ? 'Saving...' : (isEditMode ? 'Update Strand' : 'Create Strand')}
                         </button>
                     </div>
                 </form>

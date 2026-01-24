@@ -287,22 +287,42 @@ def update_assignment_status(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def assigned_courses_api(request):
-    """DRF API endpoint for teacher's assigned courses"""
+    """DRF API endpoint for teacher's assigned subjects (Learning Areas in CBC)"""
     if not hasattr(request.user, 'teacher'):
         return Response({'error': 'Forbidden'}, status=403)
 
-    courses = request.user.teacher.course_set.all()
-    serializer = CourseSerializer(courses, many=True)
+    from .serializers import LearningAreaSerializer
+    from cbc.models import LearningArea
     
-    # Calculate unique student count across all courses
+    # Get CBC Learning Areas assigned to this teacher
+    learning_areas = LearningArea.objects.filter(teacher=request.user.teacher, is_active=True)
+    serializer = LearningAreaSerializer(learning_areas, many=True)
+    
+    # Calculate unique student count across all assigned learning areas
     unique_students = Student.objects.filter(
-        enrolled_courses__teacher=request.user.teacher
+        learning_areas__teacher=request.user.teacher
     ).distinct().count()
     
     return Response({
         'courses': serializer.data,
         'unique_student_count': unique_students
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def course_detail_api(request, course_id):
+    """DRF API endpoint for learning area detail (replaces course detail)"""
+    # In the new CBC-first architecture, teacher "courses" are LearningArea objects.
+    from cbc.models import LearningArea
+    area = get_object_or_404(LearningArea, id=course_id)
+    
+    # Check permission: Teacher must be assigned to this area or be superuser
+    if not (request.user.is_superuser or area.teacher == request.user.teacher):
+        return Response({'error': 'Permission denied'}, status=403)
+        
+    from .serializers import LearningAreaSerializer
+    serializer = LearningAreaSerializer(area)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

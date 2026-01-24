@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
+import LearningOutcomeSelector from './LearningOutcomeSelector';
 import {
     PlusIcon,
     TrashIcon,
@@ -10,12 +11,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 
-const QuizBuilder = ({ lessonId, quiz, onClose, onSave }) => {
-    const { post, put, del } = useApi();
+const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
+    const { get, post, put, del } = useApi();
     const { showToast } = useAppState();
     const isEditMode = Boolean(quiz);
     const [submitting, setSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState('settings'); // 'settings' or 'questions'
+    const [savedQuiz, setSavedQuiz] = useState(quiz);
+
+    const [selectedStrand, setSelectedStrand] = useState(quiz?.strand_id || null);
+    const [selectedOutcome, setSelectedOutcome] = useState(quiz?.learning_outcome ? { id: quiz.learning_outcome, description: quiz.learning_outcome_description } : null);
 
     const [formData, setFormData] = useState({
         title: quiz?.title || '',
@@ -46,17 +51,25 @@ const QuizBuilder = ({ lessonId, quiz, onClose, onSave }) => {
         e.preventDefault();
         setSubmitting(true);
         try {
-            const payload = { ...formData, lesson: lessonId };
-            if (isEditMode) {
-                await put(`/api/teacher/quizzes/${quiz.id}/`, payload);
+            const payload = {
+                ...formData,
+                lesson: lessonId,
+                learning_area: courseId,
+                learning_outcome: selectedOutcome?.id
+            };
+
+            if (savedQuiz) {
+                const response = await put(`/api/teacher/quizzes/${savedQuiz.id}/`, payload);
+                setSavedQuiz(response);
                 showToast('Quiz settings updated!');
+                setActiveTab('questions');
             } else {
                 const response = await post(`/api/teacher/lessons/${lessonId}/quizzes/`, payload);
+                setSavedQuiz(response);
                 showToast('Quiz created! Now add some questions.');
-                onSave(response); // Assuming onSave can handle the new quiz
-                // Instead of closing, we might want to stay and add questions
-                onClose();
+                setActiveTab('questions');
             }
+            onSave(); // Refresh course data
         } catch (error) {
             console.error('Error saving quiz:', error);
             showToast('Failed to save quiz', 'error');
@@ -80,16 +93,20 @@ const QuizBuilder = ({ lessonId, quiz, onClose, onSave }) => {
         e.preventDefault();
         setSubmitting(true);
         try {
+            const quizId = savedQuiz.id;
             if (editingQuestion.id) {
-                await put(`/api/teacher/quizzes/${quiz.id}/questions/${editingQuestion.id}/`, editingQuestion);
+                await put(`/api/teacher/quizzes/${quizId}/questions/${editingQuestion.id}/`, editingQuestion);
                 showToast('Question updated!');
             } else {
-                await post(`/api/teacher/quizzes/${quiz.id}/questions/`, editingQuestion);
+                await post(`/api/teacher/quizzes/${quizId}/questions/`, editingQuestion);
                 showToast('Question added!');
             }
-            // Refresh quiz data (this is simplified, ideally the parent re-fetches)
-            onSave();
+
+            // Refresh local questions
+            const updatedQuiz = await get(`/api/teacher/quizzes/${quizId}/`);
+            setQuestions(updatedQuiz.questions || []);
             setEditingQuestion(null);
+            onSave();
         } catch (error) {
             console.error('Error saving question:', error);
             showToast('Failed to save question', 'error');
@@ -101,8 +118,10 @@ const QuizBuilder = ({ lessonId, quiz, onClose, onSave }) => {
     const handleDeleteQuestion = async (qId) => {
         if (!window.confirm('Delete this question?')) return;
         try {
-            await del(`/api/teacher/quizzes/${quiz.id}/questions/${qId}/`);
+            await del(`/api/teacher/quizzes/${savedQuiz.id}/questions/${qId}/`);
             showToast('Question deleted');
+            const updatedQuiz = await get(`/api/teacher/quizzes/${savedQuiz.id}/`);
+            setQuestions(updatedQuiz.questions || []);
             onSave();
         } catch (error) {
             showToast('Failed to delete question', 'error');
@@ -110,128 +129,148 @@ const QuizBuilder = ({ lessonId, quiz, onClose, onSave }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[200] p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div className="px-10 py-8 border-b border-gray-100 flex items-center justify-between bg-slate-50">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            {isEditMode ? `Editing: ${quiz.title}` : 'Build New Quiz'}
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#18216D] mb-1">Competency Assessment Builder</p>
+                        <h2 className="text-3xl font-black text-[#18216D] tracking-tight">
+                            {savedQuiz ? `Editing: ${savedQuiz.title}` : 'New Assessment'}
                         </h2>
-                        <p className="text-sm text-gray-500 mt-1">Create an interactive assessment for your students</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors shadow-sm">
-                        <XMarkIcon className="w-6 h-6 text-gray-400" />
+                    <button onClick={onClose} className="p-3 bg-white border border-gray-200 rounded-2xl text-gray-400 hover:text-red-500 hover:border-red-100 transition-all shadow-sm">
+                        <XMarkIcon className="w-6 h-6" />
                     </button>
                 </div>
 
                 {/* Tabs */}
-                {isEditMode && (
-                    <div className="flex px-8 border-b border-gray-100 space-x-8 bg-white">
-                        <button
-                            onClick={() => setActiveTab('settings')}
-                            className={`py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'settings' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        >
-                            Quiz Settings
-                        </button>
+                <div className="flex px-10 border-b border-gray-100 space-x-10 bg-white">
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        className={`py-5 text-xs font-black uppercase tracking-widest border-b-4 transition-all ${activeTab === 'settings' ? 'border-[#18216D] text-[#18216D]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Assessment Configuration
+                    </button>
+                    {savedQuiz && (
                         <button
                             onClick={() => setActiveTab('questions')}
-                            className={`py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'questions' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                            className={`py-5 text-xs font-black uppercase tracking-widest border-b-4 transition-all ${activeTab === 'questions' ? 'border-[#18216D] text-[#18216D]' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                         >
-                            Questions ({questions.length})
+                            Question Bank ({questions.length})
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
 
-                <div className="flex-1 overflow-y-auto p-8">
+                <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
                     {activeTab === 'settings' ? (
-                        <form onSubmit={handleSaveSettings} className="space-y-6 max-w-2xl">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 text-transform uppercase">Quiz Title</label>
-                                <input
-                                    type="text" name="title" value={formData.title} onChange={handleSettingsChange}
-                                    className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
-                                    placeholder="e.g., Python Basics Mastery Test" required
+                        <form onSubmit={handleSaveSettings} className="space-y-10 max-w-3xl">
+                            {/* CBC Integration */}
+                            <section className="space-y-6">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">1</span>
+                                    <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs">Curriculum Mapping</h3>
+                                </div>
+
+                                <LearningOutcomeSelector
+                                    learningAreaId={courseId}
+                                    strandId={selectedStrand}
+                                    selectedOutcome={selectedOutcome}
+                                    onChange={setSelectedOutcome}
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2 text-transform uppercase">Instructions</label>
-                                <textarea
-                                    name="instructions" value={formData.instructions} onChange={handleSettingsChange}
-                                    className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none h-32"
-                                    placeholder="Tell students what to expect..."
-                                />
-                            </div>
+                            </section>
+
+                            <section className="space-y-6">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm">2</span>
+                                    <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs">General Details</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    <input
+                                        type="text" name="title" value={formData.title} onChange={handleSettingsChange}
+                                        className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
+                                        placeholder="Assessment Title (e.g., Mathematics End of Term Quiz)" required
+                                    />
+                                    <textarea
+                                        name="instructions" value={formData.instructions} onChange={handleSettingsChange}
+                                        className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none h-32 resize-none"
+                                        placeholder="Clear instructions for the scholar..."
+                                    />
+                                </div>
+                            </section>
+
                             <div className="grid grid-cols-2 gap-8">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2 text-transform uppercase">Time Limit (mins)</label>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Time Limit (Min)</label>
                                     <input
                                         type="number" name="time_limit_minutes" value={formData.time_limit_minutes} onChange={handleSettingsChange}
-                                        className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                                        className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
                                         min="0"
                                     />
-                                    <p className="text-xs text-gray-400 mt-2 italic">Set to 0 for unlimited time</p>
+                                    <p className="text-[10px] text-slate-400 mt-2 italic ml-1">Set to 0 for unlimited time</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-2 text-transform uppercase">Max Attempts</label>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Allowed Attempts</label>
                                     <input
                                         type="number" name="max_attempts" value={formData.max_attempts} onChange={handleSettingsChange}
-                                        className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all outline-none"
+                                        className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
                                         min="1"
                                     />
                                 </div>
                             </div>
-                            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                                <label className="flex items-center space-x-3 cursor-pointer group">
+
+                            <div className="bg-[#18216D]/5 p-6 rounded-2xl border border-[#18216D]/10">
+                                <label className="flex items-center space-x-4 cursor-pointer group">
                                     <input
                                         type="checkbox" name="is_published" checked={formData.is_published} onChange={handleSettingsChange}
-                                        className="w-5 h-5 text-blue-600 rounded-lg border-gray-300 focus:ring-blue-500 transition-shadow"
+                                        className="w-6 h-6 text-[#18216D] rounded-lg border-gray-300 focus:ring-[#18216D] transition-shadow"
                                     />
-                                    <span className="text-sm font-bold text-gray-700 group-hover:text-blue-700 transition-colors">Publish this quiz immediately</span>
+                                    <span className="text-sm font-black text-[#18216D] group-hover:text-[#0D164F] transition-colors uppercase tracking-widest">Publish assessment immediately</span>
                                 </label>
                             </div>
-                            <div className="pt-6">
+
+                            <div className="pt-4">
                                 <button
                                     type="submit" disabled={submitting}
-                                    className="w-full sm:w-auto px-10 py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg hover:shadow-black/20 disabled:opacity-50"
+                                    className="px-10 py-5 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:bg-[#0D164F] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
                                 >
-                                    {submitting ? 'Saving...' : (isEditMode ? 'Update Quiz' : 'Create & Continue')}
+                                    {submitting ? 'Authenticating...' : (savedQuiz ? 'Update Configuration' : 'Create & Add Questions')}
                                 </button>
                             </div>
                         </form>
                     ) : (
                         <div className="space-y-6">
                             {editingQuestion ? (
-                                <form onSubmit={handleSaveQuestion} className="bg-gray-50 p-8 rounded-2xl border border-gray-200 shadow-inner">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h4 className="text-lg font-bold text-gray-900">
+                                <form onSubmit={handleSaveQuestion} className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-100 animate-in slide-in-from-top-4 duration-300">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h4 className="text-xl font-black text-[#18216D] tracking-tight">
                                             {editingQuestion.id ? 'Edit Question' : 'New Multiple Choice Question'}
                                         </h4>
-                                        <button type="button" onClick={() => setEditingQuestion(null)} className="text-gray-400 hover:text-gray-600">
-                                            Cancel
+                                        <button type="button" onClick={() => setEditingQuestion(null)} className="text-slate-400 hover:text-red-500 font-black uppercase text-[10px] tracking-widest">
+                                            Discard Change
                                         </button>
                                     </div>
-                                    <div className="space-y-6">
+                                    <div className="space-y-8">
                                         <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-tight">Question Prompt</label>
+                                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Question Prompt</label>
                                             <textarea
                                                 value={editingQuestion.prompt}
                                                 onChange={e => setEditingQuestion({ ...editingQuestion, prompt: e.target.value })}
-                                                className="w-full px-5 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-24 shadow-sm"
-                                                placeholder="Ask your question here..." required
+                                                className="w-full px-5 py-4 bg-white border-2 border-transparent focus:border-[#18216D] rounded-2xl transition-all font-bold text-gray-900 outline-none h-28 shadow-sm"
+                                                placeholder="Define the problem..." required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-tight">Options & Correct Answer</label>
+                                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Assessment Options & Key</label>
                                             <div className="space-y-3">
                                                 {editingQuestion.choices.map((choice, index) => (
-                                                    <div key={index} className="flex items-center space-x-3 group">
+                                                    <div key={index} className="flex items-center space-x-4">
                                                         <button
                                                             type="button"
                                                             onClick={() => setEditingQuestion({ ...editingQuestion, correct_answer: index })}
-                                                            className={`flex-shrink-0 p-1.5 rounded-full transition-all ${editingQuestion.correct_answer === index ? 'text-green-600 bg-green-50' : 'text-gray-300 hover:text-gray-400'}`}
+                                                            className={`flex-shrink-0 w-10 h-10 rounded-xl transition-all flex items-center justify-center ${editingQuestion.correct_answer === index ? 'text-white bg-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-white text-slate-200 border-2 border-slate-50 hover:border-slate-200'}`}
                                                         >
-                                                            {editingQuestion.correct_answer === index ? <CheckCircleIconSolid className="w-8 h-8" /> : <CheckCircleIcon className="w-8 h-8" />}
+                                                            {editingQuestion.correct_answer === index ? <CheckCircleIconSolid className="w-6 h-6" /> : <div className="w-4 h-4 bg-transparent border-2 border-current rounded-full" />}
                                                         </button>
                                                         <input
                                                             type="text" value={choice}
@@ -240,54 +279,54 @@ const QuizBuilder = ({ lessonId, quiz, onClose, onSave }) => {
                                                                 newChoices[index] = e.target.value;
                                                                 setEditingQuestion({ ...editingQuestion, choices: newChoices });
                                                             }}
-                                                            className={`flex-1 px-5 py-3 border rounded-xl outline-none transition-all ${editingQuestion.correct_answer === index ? 'border-green-200 bg-white ring-2 ring-green-100' : 'border-gray-200 bg-white'}`}
+                                                            className={`flex-1 px-5 py-4 border-2 rounded-2xl outline-none transition-all font-bold text-sm ${editingQuestion.correct_answer === index ? 'border-emerald-100 bg-emerald-50/30' : 'border-transparent bg-white shadow-sm'}`}
                                                             placeholder={`Option ${index + 1}`} required
                                                         />
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="flex space-x-4 pt-4">
+                                        <div className="flex gap-4 pt-6">
                                             <button
                                                 type="submit" disabled={submitting}
-                                                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md"
+                                                className="px-8 py-4 bg-[#18216D] text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-[#0D164F] transition-all shadow-lg"
                                             >
                                                 {submitting ? 'Saving...' : 'Save Question'}
                                             </button>
                                             <button
                                                 type="button" onClick={() => setEditingQuestion(null)}
-                                                className="px-8 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm"
+                                                className="px-8 py-4 bg-white text-slate-400 border border-slate-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all"
                                             >
-                                                Discard
+                                                Cancel
                                             </button>
                                         </div>
                                     </div>
                                 </form>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-6">
                                     <button
                                         onClick={handleAddQuestion}
-                                        className="w-full flex items-center justify-center space-x-2 p-6 border-2 border-dashed border-gray-200 rounded-2xl text-gray-500 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group"
+                                        className="w-full flex items-center justify-center space-x-3 p-8 border-2 border-dashed border-slate-100 rounded-[2.5rem] text-slate-300 hover:border-[#18216D] hover:text-[#18216D] hover:bg-slate-50 transition-all group"
                                     >
                                         <PlusIcon className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                                        <span className="font-bold">Add Question</span>
+                                        <span className="font-black uppercase tracking-[0.2em] text-xs">Append New Question</span>
                                     </button>
 
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                         {questions.map((q, idx) => (
-                                            <div key={q.id} className="flex items-center space-x-4 p-5 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow group">
-                                                <div className="flex-shrink-0 text-xs font-black text-gray-300 uppercase tracking-widest bg-gray-50 w-10 h-10 flex items-center justify-center rounded-lg">
-                                                    Q{idx + 1}
+                                            <div key={q.id} className="flex items-center space-x-6 p-6 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-indigo-900/5 transition-all group">
+                                                <div className="flex-shrink-0 text-[10px] font-black text-slate-300 uppercase tracking-widest bg-slate-50 w-12 h-12 flex items-center justify-center rounded-2xl">
+                                                    #{idx + 1}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-gray-900 font-bold truncate">{q.prompt}</p>
-                                                    <p className="text-xs text-gray-400 mt-1 uppercase font-semibold">{q.points} Point{q.points !== 1 ? 's' : ''} • Multiple Choice</p>
+                                                    <p className="text-[#18216D] font-black truncate text-sm">{q.prompt}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1 uppercase font-black tracking-widest">{q.points} Point Assessment • Multiple Choice</p>
                                                 </div>
-                                                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => setEditingQuestion(q)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shadow-sm bg-white">
+                                                <div className="flex items-center space-x-3 opacity-0 group-hover:opacity-100 transition-all">
+                                                    <button onClick={() => setEditingQuestion(q)} className="p-3 text-blue-600 hover:bg-blue-50 bg-slate-50 rounded-xl transition-all">
                                                         <Bars3Icon className="w-5 h-5" />
                                                     </button>
-                                                    <button onClick={() => handleDeleteQuestion(q.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-sm bg-white">
+                                                    <button onClick={() => handleDeleteQuestion(q.id)} className="p-3 text-red-600 hover:bg-red-50 bg-slate-50 rounded-xl transition-all">
                                                         <TrashIcon className="w-5 h-5" />
                                                     </button>
                                                 </div>

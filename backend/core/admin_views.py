@@ -121,6 +121,9 @@ def admin_teachers(request):
         data.append({
             'id': teacher.id,
             'name': f"{teacher.user.first_name} {teacher.user.last_name}".strip() or teacher.user.email,
+            'user_first_name': teacher.user.first_name,
+            'user_last_name': teacher.user.last_name,
             'email': teacher.user.email,
+            'id_number': teacher.teacher_id,
         })
     return Response(data)

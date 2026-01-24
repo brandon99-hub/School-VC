@@ -297,9 +297,11 @@ def admin_stats(request):
     if not request.user.is_superuser:
         return Response({'error': 'Permission denied'}, status=403)
     
+    from cbc.models import LearningArea, Strand
     stats = {
-        'totalCourses': Course.objects.count(),
-        'activeCourses': Course.objects.filter(is_active=True).count(),
+        'totalLearningAreas': LearningArea.objects.count(),
+        'activeLearningAreas': LearningArea.objects.filter(is_active=True).count(),
+        'totalStrands': Strand.objects.count(),
         'totalTeachers': Teacher.objects.count(),
         'totalStudents': Student.objects.count(),
     }
@@ -334,7 +336,8 @@ def admin_users(request):
             'role': 'teacher',
             'username': teacher.user.username,
             'date_joined': teacher.date_joined,
-            'is_active': teacher.user.is_active
+            'is_active': teacher.user.is_active,
+            'system_id': teacher.teacher_id,
         })
         
     # Process remaining users
@@ -354,7 +357,9 @@ def admin_users(request):
             'role': role,
             'username': user.username,
             'date_joined': user.date_joined,
-            'is_active': user.is_active
+            'is_active': user.is_active,
+            'system_id': user.student_id if hasattr(user, 'student_id') else None,
+            'grade_level': user.grade_level.name if hasattr(user, 'grade_level') and user.grade_level else None,
         })
             
     return Response(data)

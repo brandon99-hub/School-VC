@@ -1,24 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
+import LearningOutcomeSelector from './LearningOutcomeSelector';
 
 const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
-    const { post, put } = useApi();
+    const { get, post, put } = useApi();
     const { showToast } = useAppState();
     const isEditMode = Boolean(assignment);
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
+
+    const [learningArea, setLearningArea] = useState(null);
+    const [strands, setStrands] = useState([]);
+    const [selectedStrand, setSelectedStrand] = useState(assignment?.strand_id || null);
+    const [selectedOutcome, setSelectedOutcome] = useState(assignment?.learning_outcome ? { id: assignment.learning_outcome, description: assignment.learning_outcome_description } : null);
 
     const [formData, setFormData] = useState({
         title: assignment?.title || '',
         description: assignment?.description || '',
         due_date: assignment?.due_date ? assignment.due_date.split('T')[0] : '',
         due_time: assignment?.due_date ? assignment.due_date.split('T')[1]?.substring(0, 5) : '23:59',
-        total_marks: assignment?.total_marks || 100,
         submission_types: assignment?.submission_types || ['file'],
         allow_late: assignment?.allow_late || false,
         late_penalty: assignment?.late_penalty || 0,
+        assessment_type: assignment?.assessment_type || 'formative',
+        criteria_ee: assignment?.criteria_ee || '',
+        criteria_me: assignment?.criteria_me || '',
+        criteria_ae: assignment?.criteria_ae || '',
+        criteria_be: assignment?.criteria_be || '',
     });
+
+    // Fetch current learning area and its strands
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+                const area = await get(`/api/cbc/learning-areas/${courseId}/`);
+                setLearningArea(area);
+
+                const strandsList = await get(`/api/cbc/learning-areas/${courseId}/strands/`);
+                setStrands(Array.isArray(strandsList) ? strandsList : []);
+            } catch (error) {
+                console.error('Error fetching curriculum data:', error);
+                showToast('Failed to load curriculum context', 'error');
+            }
+        };
+        fetchInitialData();
+    }, [courseId, get]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -45,7 +72,8 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
         if (!formData.title.trim()) newErrors.title = 'Assignment title is required';
         if (!formData.description.trim()) newErrors.description = 'Description is required';
         if (!formData.due_date) newErrors.due_date = 'Due date is required';
-        if (formData.total_marks < 1) newErrors.total_marks = 'Total marks must be at least 1';
+        if (!selectedOutcome) newErrors.learning_outcome = 'Learning Outcome is required';
+
         if (formData.submission_types.length === 0) {
             newErrors.submission_types = 'Select at least one submission type';
         }
@@ -64,12 +92,14 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
         setSubmitting(true);
         try {
             const payload = {
-                course: courseId,
                 title: formData.title,
                 description: formData.description,
                 due_date: `${formData.due_date}T${formData.due_time}:00`,
-                total_marks: parseInt(formData.total_marks),
                 status: 'Pending',
+                is_cbc_assignment: true,
+                learning_area: courseId,
+                learning_outcome: selectedOutcome.id,
+                assessment_type: formData.assessment_type,
             };
 
             if (isEditMode) {
@@ -94,189 +124,156 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900">
-                        {isEditMode ? 'Edit Assignment' : 'Create New Assignment'}
-                    </h2>
+                <div className="px-10 py-8 border-b border-gray-100 flex items-center justify-between bg-slate-50">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#18216D] mb-1">Competency-Based Assessment</p>
+                        <h2 className="text-3xl font-black text-[#18216D] tracking-tight">
+                            {isEditMode ? 'Edit Assignment' : 'New Assignment'}
+                        </h2>
+                    </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="p-3 bg-white border border-gray-200 rounded-2xl text-gray-400 hover:text-red-500 hover:border-red-100 transition-all shadow-sm"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <i className="fas fa-times text-xl"></i>
                     </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Assignment Title *
-                        </label>
-                        <input
-                            type="text"
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.title ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                            placeholder="e.g., Week 1 Programming Assignment"
-                        />
-                        {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Description *
-                        </label>
-                        <textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            rows="5"
-                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.description ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                            placeholder="Describe the assignment requirements, objectives, and any special instructions..."
-                        />
-                        {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+                {/* Form Content */}
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                    {/* Context Context */}
+                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="w-12 h-12 bg-[#18216D] text-white rounded-xl flex items-center justify-center font-black">
+                            {learningArea?.name?.[0]}
+                        </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Due Date *
-                            </label>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Assigned Area</p>
+                            <h4 className="font-black text-[#18216D] uppercase tracking-tight">{learningArea?.name} - {learningArea?.grade_level_name}</h4>
+                        </div>
+                    </div>
+
+                    {/* Outcome Selection */}
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">1</span>
+                            <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs">Competency Selection</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Curriculum Strand</label>
+                                <select
+                                    value={selectedStrand || ''}
+                                    onChange={(e) => {
+                                        setSelectedStrand(e.target.value);
+                                        setSelectedOutcome(null);
+                                    }}
+                                    className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
+                                >
+                                    <option value="">Select a strand...</option>
+                                    {strands.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {selectedStrand && (
+                                <LearningOutcomeSelector
+                                    learningAreaId={courseId}
+                                    strandId={selectedStrand}
+                                    selectedOutcome={selectedOutcome}
+                                    onChange={setSelectedOutcome}
+                                />
+                            )}
+                        </div>
+                        {errors.learning_outcome && <p className="text-red-500 text-xs font-bold mt-2 ml-1">{errors.learning_outcome}</p>}
+                    </section>
+
+                    {/* Assessment Details */}
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm">2</span>
+                            <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs">Assignment Details</h3>
+                        </div>
+
+                        <div className="space-y-4">
+                            <input
+                                type="text"
+                                name="title"
+                                value={formData.title}
+                                onChange={handleChange}
+                                placeholder="Assignment Title (e.g. Weekly Math Quiz)"
+                                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
+                            />
+                            <textarea
+                                name="description"
+                                value={formData.description}
+                                onChange={handleChange}
+                                placeholder="Describe the instructions for this competency task..."
+                                rows="4"
+                                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none resize-none"
+                            />
+                        </div>
+                    </section>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Assessment Type */}
+                        <div className="space-y-4">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Evaluation Type</label>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, assessment_type: 'formative' }))}
+                                    className={`flex-1 p-4 rounded-2xl border-2 transition-all text-center ${formData.assessment_type === 'formative' ? 'border-[#18216D] bg-[#18216D]/5 text-[#18216D]' : 'border-slate-50 text-gray-400 hover:border-gray-200'}`}
+                                >
+                                    <p className="font-black text-xs uppercase">Formative</p>
+                                    <p className="text-[10px] font-bold opacity-70 mt-1">Ongoing</p>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(p => ({ ...p, assessment_type: 'summative' }))}
+                                    className={`flex-1 p-4 rounded-2xl border-2 transition-all text-center ${formData.assessment_type === 'summative' ? 'border-[#18216D] bg-[#18216D]/5 text-[#18216D]' : 'border-slate-50 text-gray-400 hover:border-gray-200'}`}
+                                >
+                                    <p className="font-black text-xs uppercase">Summative</p>
+                                    <p className="text-[10px] font-bold opacity-70 mt-1">End of Strand</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Due Date */}
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Deadline Date</label>
                             <input
                                 type="date"
                                 name="due_date"
                                 value={formData.due_date}
                                 onChange={handleChange}
-                                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.due_date ? 'border-red-500' : 'border-gray-300'
-                                    }`}
-                            />
-                            {errors.due_date && <p className="text-red-500 text-sm mt-1">{errors.due_date}</p>}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Due Time
-                            </label>
-                            <input
-                                type="time"
-                                name="due_time"
-                                value={formData.due_time}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
                             />
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Total Marks *
-                        </label>
-                        <input
-                            type="number"
-                            name="total_marks"
-                            value={formData.total_marks}
-                            onChange={handleChange}
-                            min="1"
-                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.total_marks ? 'border-red-500' : 'border-gray-300'
-                                }`}
-                        />
-                        {errors.total_marks && <p className="text-red-500 text-sm mt-1">{errors.total_marks}</p>}
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Submission Types *
-                        </label>
-                        <div className="space-y-2">
-                            <label className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.submission_types.includes('file')}
-                                    onChange={() => handleSubmissionTypeToggle('file')}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-700">File Upload</span>
-                            </label>
-                            <label className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.submission_types.includes('text')}
-                                    onChange={() => handleSubmissionTypeToggle('text')}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-700">Text Response</span>
-                            </label>
-                            <label className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.submission_types.includes('url')}
-                                    onChange={() => handleSubmissionTypeToggle('url')}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-700">URL/Link</span>
-                            </label>
-                        </div>
-                        {errors.submission_types && <p className="text-red-500 text-sm mt-1">{errors.submission_types}</p>}
-                    </div>
-
-                    <div className="border-t border-gray-200 pt-4">
-                        <label className="flex items-center">
-                            <input
-                                type="checkbox"
-                                name="allow_late"
-                                checked={formData.allow_late}
-                                onChange={handleChange}
-                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <span className="ml-2 text-sm font-medium text-gray-700">
-                                Allow late submissions
-                            </span>
-                        </label>
-
-                        {formData.allow_late && (
-                            <div className="mt-3 ml-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Late Penalty (% per day)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="late_penalty"
-                                    value={formData.late_penalty}
-                                    onChange={handleChange}
-                                    min="0"
-                                    max="100"
-                                    className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gray-200">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={submitting}
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? 'Saving...' : (isEditMode ? 'Update Assignment' : 'Create Assignment')}
-                        </button>
                     </div>
                 </form>
+
+                {/* Footer */}
+                <div className="px-10 py-6 border-t border-gray-100 bg-slate-50 flex items-center justify-end gap-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-8 py-4 text-gray-500 font-black text-xs uppercase tracking-widest hover:text-gray-900 transition-colors"
+                    >
+                        Discard
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                        className="px-10 py-5 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:bg-[#0D164F] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                        {submitting ? 'Authenticating...' : (isEditMode ? 'Update Task' : 'Publish Task')}
+                    </button>
+                </div>
             </div>
         </div>
     );
