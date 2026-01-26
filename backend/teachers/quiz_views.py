@@ -9,24 +9,56 @@ from .quiz_serializers import QuizSerializer, QuizQuestionSerializer
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def lesson_quizzes_api(request, lesson_id):
-    """List all quizzes for a lesson or create a new quiz"""
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    """List all quizzes for a lesson or create a new quiz (supports CBC SubStrands as fallbacks)"""
+    from cbc.models import SubStrand, LearningArea
     
-    # Check if user is the teacher for this course
-    if not hasattr(request.user, 'teacher') or lesson.module.course.teacher != request.user.teacher:
+    lesson = None
+    sub_strand = None
+    learning_area = None
+    
+    try:
+        lesson = Lesson.objects.get(id=lesson_id)
+        learning_area_entity = lesson.module.course.teacher if hasattr(lesson.module.course, 'teacher') else None
+        course_teacher = learning_area_entity
+    except Lesson.DoesNotExist:
+        # Fallback to CBC SubStrand
+        try:
+            sub_strand = SubStrand.objects.get(id=lesson_id)
+            learning_area = sub_strand.strand.learning_area
+            course_teacher = learning_area.teacher
+        except SubStrand.DoesNotExist:
+            return Response({'error': 'Lesson or Sub-Strand not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user is the teacher for this course/learning area
+    is_teacher = False
+    if hasattr(request.user, 'teacher'):
+        if lesson and lesson.module.course.teacher == request.user.teacher:
+            is_teacher = True
+        elif learning_area and learning_area.teacher == request.user.teacher:
+            is_teacher = True
+            
+    if not is_teacher and not request.user.is_superuser:
         return Response(
-            {'error': 'You do not have permission to manage this lesson'},
+            {'error': 'You do not have permission to manage this quiz area'},
             status=status.HTTP_403_FORBIDDEN
         )
     
     if request.method == 'GET':
-        quizzes = Quiz.objects.filter(lesson=lesson)
+        if lesson:
+            quizzes = Quiz.objects.filter(lesson=lesson)
+        else:
+            quizzes = Quiz.objects.filter(learning_area=learning_area)
         serializer = QuizSerializer(quizzes, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
         data = request.data.copy()
-        data['lesson'] = lesson_id
+        if lesson:
+            data['lesson'] = lesson_id
+        else:
+            data['lesson'] = None
+            data['learning_area'] = learning_area.id
+            
         serializer = QuizSerializer(data=data)
         if serializer.is_valid():
             quiz = serializer.save()
@@ -39,8 +71,15 @@ def quiz_detail_api(request, quiz_id):
     """Retrieve, update or delete a quiz"""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     
-    # Check if user is the teacher for this course
-    if not hasattr(request.user, 'teacher') or quiz.lesson.module.course.teacher != request.user.teacher:
+    # Check if user is the teacher for this area (supports both Course and Learning Area)
+    is_teacher = False
+    if hasattr(request.user, 'teacher'):
+        if quiz.lesson and quiz.lesson.module.course.teacher == request.user.teacher:
+            is_teacher = True
+        elif quiz.learning_area and quiz.learning_area.teacher == request.user.teacher:
+            is_teacher = True
+            
+    if not is_teacher and not request.user.is_superuser:
         return Response(
             {'error': 'You do not have permission to manage this quiz'},
             status=status.HTTP_403_FORBIDDEN
@@ -67,8 +106,15 @@ def quiz_question_api(request, quiz_id, question_id=None):
     """Manage questions for a quiz"""
     quiz = get_object_or_404(Quiz, id=quiz_id)
     
-    # Check if user is the teacher for this course
-    if not hasattr(request.user, 'teacher') or quiz.lesson.module.course.teacher != request.user.teacher:
+    # Check if user is the teacher for this area (supports both Course and Learning Area)
+    is_teacher = False
+    if hasattr(request.user, 'teacher'):
+        if quiz.lesson and quiz.lesson.module.course.teacher == request.user.teacher:
+            is_teacher = True
+        elif quiz.learning_area and quiz.learning_area.teacher == request.user.teacher:
+            is_teacher = True
+            
+    if not is_teacher and not request.user.is_superuser:
         return Response(
             {'error': 'You do not have permission to manage this quiz'},
             status=status.HTTP_403_FORBIDDEN

@@ -54,7 +54,7 @@ class Command(BaseCommand):
 
             # Strand 1: Numbers
             numbers_strand, _ = Strand.objects.get_or_create(
-                code='MATH-G4-NUMBERS',
+                code='MATH-G4-NUM',
                 defaults={
                     'learning_area': math_area,
                     'name': 'Numbers',
@@ -187,7 +187,7 @@ class Command(BaseCommand):
 
             # Strand 2: Measurement
             measurement_strand, _ = Strand.objects.get_or_create(
-                code='MATH-G4-MEASUREMENT',
+                code='MATH-G4-MEAS',
                 defaults={
                     'learning_area': math_area,
                     'name': 'Measurement',

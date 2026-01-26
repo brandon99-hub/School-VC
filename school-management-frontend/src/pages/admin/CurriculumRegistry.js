@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
 
-const GenericModal = ({ isOpen, onClose, title, children, footer }) => {
+const GenericModal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-lg' }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className={`bg-white rounded-[2rem] shadow-2xl ${maxWidth} w-full overflow-hidden animate-in zoom-in-95 duration-200`}>
                 <div className="px-8 py-6 bg-slate-50 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">{title}</h3>
                     <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors text-gray-400">
@@ -189,14 +189,382 @@ const LearningAreaCard = ({ area, onManage, searchQuery }) => {
     );
 };
 
+const LearningAreaManagerModal = ({ isOpen, onClose, area, onRefresh }) => {
+    const { get, post, put, delete: del } = useApi();
+    const { showToast } = useAppState();
+    const [details, setDetails] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [editor, setEditor] = useState(null); // { type, mode, data, parentId }
+    const [inlineEdit, setInlineEdit] = useState(null); // { type, id, field, value }
+    const [areaEdit, setAreaEdit] = useState(false);
+
+    const fetchDetails = useCallback(async () => {
+        if (!area?.id) return;
+        setLoading(true);
+        try {
+            const data = await get(`/api/cbc/learning-areas/${area.id}/`);
+            setDetails(data);
+        } catch (err) {
+            showToast('Failed to load details', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [area?.id, get, showToast]);
+
+    useEffect(() => {
+        if (isOpen) fetchDetails();
+    }, [isOpen, fetchDetails]);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const payload = Object.fromEntries(formData.entries());
+
+        try {
+            const endpoint = (editor.type === 'learning-outcome' ? '/api/cbc/learning-outcomes/' : `/api/cbc/${editor.type}s/`) + (editor.mode === 'edit' ? `${editor.data.id}/` : '');
+            const method = editor.mode === 'edit' ? put : post;
+
+            // Add parent link
+            if (editor.mode === 'create') {
+                if (editor.type === 'strand') payload.learning_area = editor.parentId;
+                if (editor.type === 'sub-strand') payload.strand = editor.parentId;
+                if (editor.type === 'learning-outcome') payload.sub_strand = editor.parentId;
+            }
+
+            await method(endpoint, payload);
+            showToast(`${editor.type} saved successfully`, 'success');
+            setEditor(null);
+            fetchDetails();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            showToast(`Failed to save ${editor.type}: ${err.message}`, 'error');
+        }
+    };
+
+    const handleInlineSave = async (type, id, field, newValue) => {
+        try {
+            const endpoint = (type === 'learning-outcome' ? `/api/cbc/learning-outcomes/${id}/` : `/api/cbc/${type}s/${id}/`);
+            await put(endpoint, { [field]: newValue });
+            showToast('Updated successfully', 'success');
+            setInlineEdit(null);
+            fetchDetails();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            showToast('Update failed', 'error');
+        }
+    };
+
+    const handleAreaSave = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const payload = Object.fromEntries(formData.entries());
+        try {
+            await put(`/api/cbc/learning-areas/${area.id}/`, payload);
+            showToast('Learning Area updated', 'success');
+            setAreaEdit(false);
+            fetchDetails();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            showToast('Update failed', 'error');
+        }
+    };
+
+    const handleDelete = async (type, id) => {
+        if (!window.confirm(`Are you sure you want to delete this ${type}?`)) return;
+        try {
+            const endpoint = (type === 'learning-outcome' ? `/api/cbc/learning-outcomes/${id}/` : `/api/cbc/${type}s/${id}/`);
+            await del(endpoint);
+            showToast(`${type} deleted`, 'success');
+            fetchDetails();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            showToast(`Failed to delete ${type}`, 'error');
+        }
+    };
+
+    return (
+        <GenericModal isOpen={isOpen} onClose={onClose} title={`Governance: ${area?.name}`} maxWidth="max-w-4xl">
+            <div className="space-y-6">
+                {/* Learning Area Edit Section */}
+                <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl">🏛️</span>
+                            <div>
+                                <h4 className="text-sm font-black text-[#18216D] uppercase tracking-widest leading-none">Learning Area Identity</h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Managed Registry Node: {area?.code}</p>
+                            </div>
+                        </div>
+                        {!areaEdit ? (
+                            <button onClick={() => setAreaEdit(true)} className="px-4 py-2 bg-white text-[#18216D] border border-indigo-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                                <i className="fas fa-edit mr-2"></i> Edit Identity
+                            </button>
+                        ) : (
+                            <button onClick={() => setAreaEdit(false)} className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                                Cancel
+                            </button>
+                        )}
+                    </div>
+
+                    {areaEdit ? (
+                        <form onSubmit={handleAreaSave} className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-300">
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Display Name</label>
+                                <input name="name" defaultValue={details?.name} className="w-full px-4 py-2.5 bg-white border border-indigo-100 rounded-xl font-bold text-sm" required />
+                            </div>
+                            <div>
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Registry Code</label>
+                                <input name="code" defaultValue={details?.code} className="w-full px-4 py-2.5 bg-white border border-indigo-100 rounded-xl font-bold text-sm" required />
+                            </div>
+                            <div className="md:col-span-2">
+                                <button type="submit" className="w-full py-3 bg-[#18216D] text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-900/20">
+                                    Apply Changes to Registry
+                                </button>
+                            </div>
+                        </form>
+                    ) : (
+                        <div className="flex gap-6 mt-4">
+                            <div className="bg-white p-3 rounded-2xl border border-indigo-50 flex-1">
+                                <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5">Title</span>
+                                <p className="text-xs font-black text-gray-900">{details?.name || area?.name}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-2xl border border-indigo-50 w-32 text-center">
+                                <span className="text-[8px] font-black text-slate-400 uppercase block mb-0.5">Code</span>
+                                <p className="text-xs font-black text-indigo-600">{details?.code || area?.code}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-between items-center py-4 border-t border-slate-100">
+                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Curriculum Components</h4>
+                    <button
+                        onClick={() => setEditor({ type: 'strand', mode: 'create', parentId: area.id })}
+                        className="px-6 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] shadow-xl shadow-black/10 hover:bg-black transition-all"
+                    >
+                        <i className="fas fa-plus mr-2"></i> Register New Strand
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="py-20 text-center animate-pulse text-[10px] font-black text-slate-300 uppercase tracking-widest">Accessing Registry...</div>
+                ) : (
+                    <div className="space-y-4">
+                        {details?.strands?.map(strand => (
+                            <div key={strand.id} className="border border-slate-100 rounded-3xl p-5 bg-slate-50/30">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-[#18216D] text-white flex items-center justify-center text-[10px] shadow-lg">
+                                            <i className="fas fa-layer-group"></i>
+                                        </div>
+                                        <div>
+                                            <h5 className="text-xs font-black text-[#18216D] uppercase tracking-wider leading-none">{strand.name}</h5>
+                                            <p className="text-[9px] text-slate-400 font-mono mt-0.5">{strand.code}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setEditor({ type: 'sub-strand', mode: 'create', parentId: strand.id })} className="p-2 bg-white rounded-lg text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-slate-100" title="Add Sub-strand">
+                                            <i className="fas fa-plus text-[10px]"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => setInlineEdit({ type: 'strand', id: strand.id, field: 'name', value: strand.name })}
+                                            className="p-2 bg-white rounded-lg text-slate-400 hover:text-indigo-600 transition-all shadow-sm border border-slate-100"
+                                        >
+                                            <i className="fas fa-pen text-[10px]"></i>
+                                        </button>
+                                        <button onClick={() => handleDelete('strand', strand.id)} className="p-2 bg-white rounded-lg text-slate-400 hover:text-rose-600 transition-all shadow-sm border border-slate-100">
+                                            <i className="fas fa-trash text-[10px]"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {inlineEdit?.id === strand.id && inlineEdit.type === 'strand' && (
+                                    <div className="mb-4 flex gap-2 animate-in slide-in-from-top-2">
+                                        <input
+                                            autoFocus
+                                            className="flex-1 px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-bold"
+                                            value={inlineEdit.value}
+                                            onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                                        />
+                                        <button onClick={() => handleInlineSave('strand', strand.id, 'name', inlineEdit.value)} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-[10px] font-black uppercase">Save</button>
+                                        <button onClick={() => setInlineEdit(null)} className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase">Cancel</button>
+                                    </div>
+                                )}
+
+                                <div className="ml-8 space-y-3">
+                                    {strand.sub_strands?.map(sub => (
+                                        <div key={sub.id} className="bg-white p-4 rounded-2xl border border-slate-50 shadow-sm relative overflow-hidden group">
+                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-100 group-hover:bg-[#FFC425] transition-colors"></div>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{sub.code}</span>
+                                                    {inlineEdit?.id === sub.id && inlineEdit.type === 'sub-strand' ? (
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                autoFocus
+                                                                className="px-3 py-1 border border-indigo-200 rounded-lg text-[11px] font-black uppercase tracking-tight"
+                                                                value={inlineEdit.value}
+                                                                onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                                                            />
+                                                            <button onClick={() => handleInlineSave('sub-strand', sub.id, 'name', inlineEdit.value)} className="text-green-500 hover:scale-110"><i className="fas fa-check"></i></button>
+                                                            <button onClick={() => setInlineEdit(null)} className="text-slate-400"><i className="fas fa-times"></i></button>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[11px] font-black text-gray-700 uppercase tracking-tight">{sub.name}</p>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => setEditor({ type: 'learning-outcome', mode: 'create', parentId: sub.id })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Add Outcome">
+                                                        <i className="fas fa-bullseye text-[10px]"></i>
+                                                    </button>
+                                                    <button onClick={() => setInlineEdit({ type: 'sub-strand', id: sub.id, field: 'name', value: sub.name })} className="p-1.5 text-slate-300 hover:text-indigo-600 transition-colors">
+                                                        <i className="fas fa-pen text-[10px]"></i>
+                                                    </button>
+                                                    <button onClick={() => handleDelete('sub-strand', sub.id)} className="p-1.5 text-slate-300 hover:text-rose-600 transition-colors">
+                                                        <i className="fas fa-trash text-[10px]"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3 grid grid-cols-1 gap-2">
+                                                {sub.learning_outcomes?.map(outcome => (
+                                                    <div key={outcome.id} className="flex items-start justify-between gap-3 bg-slate-50/50 p-2 rounded-xl group/out">
+                                                        <div className="flex-1 flex items-start gap-2">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-200 mt-1.5"></div>
+                                                            {inlineEdit?.id === outcome.id && inlineEdit.type === 'learning-outcome' ? (
+                                                                <div className="flex-1 flex gap-2">
+                                                                    <textarea
+                                                                        autoFocus
+                                                                        rows={2}
+                                                                        className="flex-1 px-3 py-1.5 bg-white border border-indigo-200 rounded-lg text-[10px] font-bold text-slate-500 leading-tight resize-none"
+                                                                        value={inlineEdit.value}
+                                                                        onChange={(e) => setInlineEdit({ ...inlineEdit, value: e.target.value })}
+                                                                    />
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <button onClick={() => handleInlineSave('learning-outcome', outcome.id, 'description', inlineEdit.value)} className="text-green-500 hover:scale-110"><i className="fas fa-check"></i></button>
+                                                                        <button onClick={() => setInlineEdit(null)} className="text-slate-400"><i className="fas fa-times"></i></button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-[10px] font-bold text-slate-500 leading-tight">{outcome.description}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-1 opacity-100 lg:opacity-0 group-hover/out:opacity-100 transition-opacity">
+                                                            <button onClick={() => setInlineEdit({ type: 'learning-outcome', id: outcome.id, field: 'description', value: outcome.description })} className="text-[9px] text-slate-400 hover:text-indigo-600">
+                                                                <i className="fas fa-edit"></i>
+                                                            </button>
+                                                            <button onClick={() => handleDelete('learning-outcome', outcome.id)} className="text-[9px] text-slate-400 hover:text-rose-600">
+                                                                <i className="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {editor && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[300] flex items-center justify-center p-4">
+                    <form onSubmit={handleSave} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+                        <div className="px-8 py-6 bg-slate-50 border-b border-gray-100 flex items-center justify-between">
+                            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">
+                                {editor.mode === 'edit' ? 'Update' : 'New'} {editor.type.replace('-', ' ')}
+                            </h4>
+                            <button type="button" onClick={() => setEditor(null)} className="text-gray-400 hover:text-gray-600">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            {editor.type !== 'learning-outcome' ? (
+                                <>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Display Name</label>
+                                        <input
+                                            name="name"
+                                            defaultValue={editor.data?.name || ''}
+                                            required
+                                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-600 font-bold text-sm"
+                                            placeholder="e.g. Living Things"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Registry Code</label>
+                                        <input
+                                            name="code"
+                                            defaultValue={editor.data?.code || ''}
+                                            required
+                                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-600 font-bold text-sm"
+                                            placeholder="e.g. S1.1"
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Outcome Code</label>
+                                        <input
+                                            name="code"
+                                            defaultValue={editor.data?.code || ''}
+                                            required
+                                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-600 font-bold text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Description</label>
+                                        <textarea
+                                            name="description"
+                                            defaultValue={editor.data?.description || ''}
+                                            required
+                                            rows={4}
+                                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-600 font-bold text-sm resize-none"
+                                        />
+                                    </div>
+                                </>
+                            )}
+                            <button
+                                type="submit"
+                                className="w-full py-4 bg-[#18216D] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                                <i className="fas fa-save mr-2"></i> Commit to Registry
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+        </GenericModal>
+    );
+};
+
 const CurriculumRegistry = () => {
     const { get } = useApi();
     const { showToast } = useAppState();
     const [gradeLevels, setGradeLevels] = useState([]);
     const [selectedGrade, setSelectedGrade] = useState('all');
     const [learningAreas, setLearningAreas] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [managerArea, setManagerArea] = useState(null);
+    const [isManagerOpen, setIsManagerOpen] = useState(false);
+
+    const handleManage = (area) => {
+        setManagerArea(area);
+        setIsManagerOpen(true);
+    };
+
+    const handleRefresh = useCallback(async () => {
+        try {
+            const areas = await get('/api/cbc/learning-areas/');
+            setLearningAreas(areas || []);
+        } catch (err) {
+            console.error(err);
+        }
+    }, [get]);
 
     // Advanced search logic with hierarchy matching
     const filteredAreas = useMemo(() => {
@@ -332,13 +700,20 @@ const CurriculumRegistry = () => {
                                         key={area.id}
                                         area={area}
                                         searchQuery={searchTerm}
-                                        onManage={(a) => showToast(`Opening Governance for ${a.name}...`)}
+                                        onManage={handleManage}
                                     />
                                 ))}
                             </div>
                         )}
                     </div>
                 </main>
+
+                <LearningAreaManagerModal
+                    isOpen={isManagerOpen}
+                    onClose={() => setIsManagerOpen(false)}
+                    area={managerArea}
+                    onRefresh={handleRefresh}
+                />
             </div>
         </div>
     );

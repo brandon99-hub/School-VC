@@ -1,18 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { generateAssignmentPDF } from '../utils/pdfGenerator';
 import AssignmentSubmission from './student/AssignmentSubmission';
-import AttendanceMarker from './student/AttendanceMarker';
 import QuizTaker from './student/QuizTaker';
-import CollapsibleSection from './CollapsibleSection';
 import {
     ChartBarIcon,
     BookOpenIcon,
     ClipboardDocumentCheckIcon,
     QuestionMarkCircleIcon,
     ChatBubbleLeftRightIcon,
-    CalendarIcon,
     ArrowLeftCircleIcon,
     Bars3CenterLeftIcon
 } from '@heroicons/react/24/outline';
@@ -58,7 +55,6 @@ const Sidebar = ({ activeTab, onChange, collapsed, onBack }) => {
         { id: 'quizzes', label: 'Quizzes', icon: QuestionMarkCircleIcon },
         { id: 'submissions', label: 'My Performance', icon: ChartBarIcon },
         { id: 'discussions', label: 'Class Forum', icon: ChatBubbleLeftRightIcon },
-        { id: 'schedule', label: 'Live Sessions', icon: CalendarIcon },
     ];
 
     return (
@@ -130,32 +126,54 @@ const CourseDetail = () => {
         };
     }, [course]);
 
-    const submissionChartData = useMemo(() => {
-        const assignmentCount = submissionData.assignments.length;
-        const quizCount = submissionData.quizzes.length;
-        return [
-            { name: 'Assignments', value: assignmentCount },
-            { name: 'Quizzes', value: quizCount },
-        ];
-    }, [submissionData]);
-
     const submissionTimeline = useMemo(() => {
         const map = {};
+
+        // Helper to map CBC levels to numeric scores
+        const cbcMap = { 'EE': 95, 'ME': 75, 'AE': 50, 'BE': 25 };
+
+        // Process Quizzes
         submissionData.quizzes.forEach((submission) => {
-            if (!submission.submitted_at) {
-                return;
-            }
+            if (!submission.submitted_at) return;
             const date = new Date(submission.submitted_at).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
             });
-            if (!map[date]) {
-                map[date] = { date, Attempts: 0 };
-            }
-            map[date].Attempts += 1;
+            if (!map[date]) map[date] = { date, Score: 0, count: 0 };
+            map[date].Score += parseFloat(submission.score || 0);
+            map[date].count += 1;
         });
-        return Object.values(map);
+
+        // Process Assignments (CBC)
+        submissionData.assignments.forEach((submission) => {
+            if (!submission.submitted_at) return;
+            const date = new Date(submission.submitted_at).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+            });
+            if (!map[date]) map[date] = { date, Score: 0, count: 0 };
+            const score = cbcMap[submission.competency_level] || 0;
+            map[date].Score += score;
+            map[date].count += 1;
+        });
+
+        return Object.values(map).map(item => ({
+            ...item,
+            Performance: Math.round(item.Score / item.count)
+        }));
     }, [submissionData]);
+
+    const completionStats = useMemo(() => {
+        const totalTasks = (course?.assignments?.length || 0) + (course?.quizzes?.length || 0);
+        const completedTasks = (submissionData.assignments?.length || 0) + (submissionData.quizzes?.length || 0);
+        const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+        return [
+            { name: 'Completed', value: completedTasks, fill: '#18216D' },
+            { name: 'Remaining', value: Math.max(0, totalTasks - completedTasks), fill: '#f1f5f9' },
+            { percentage }
+        ];
+    }, [course, submissionData]);
 
 
     useEffect(() => {
@@ -295,7 +313,6 @@ const CourseDetail = () => {
                     <div className="max-w-6xl mx-auto space-y-8">
                         {activeTab === 'journey' && (
                             <div className="space-y-8">
-                                <AttendanceMarker courseId={id} courseName={course.name} />
 
                                 <div>
                                     <h2 className="text-3xl font-black text-gray-900 tracking-tight">Learning Journey</h2>
@@ -436,7 +453,7 @@ const CourseDetail = () => {
                                                                 <div className="bg-[#FFC425] px-3 py-1.5 rounded-xl shadow-lg shadow-yellow-500/10 border border-[#FFC425]/20 text-center animate-in zoom-in duration-300">
                                                                     <div className="text-[8px] font-black text-[#18216D]/60 uppercase tracking-widest leading-none mb-1">Grade</div>
                                                                     <div className="text-sm font-black text-[#18216D] leading-none">
-                                                                        {submission.competency_level || submission.grade || submission.score || 'A+'}
+                                                                        {submission.competency_level || submission.grade || (submission.score != null ? `${submission.score} pts` : 'Grades Pending')}
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -456,13 +473,13 @@ const CourseDetail = () => {
 
                                                         <div className="pt-4 flex items-center gap-3">
                                                             <button
-                                                                onClick={() => setSubmittingAssignment(assignment)}
-                                                                disabled={isSubmitted}
-                                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${isSubmitted
+                                                                onClick={() => setSubmittingAssignment({ ...assignment, existing_submission: (course.assignment_submissions || []).find(s => s.assignment === assignment.id) })}
+                                                                disabled={isGraded}
+                                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg ${isGraded
                                                                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
                                                                     : 'bg-[#18216D] text-white hover:bg-[#0D164F] shadow-indigo-900/10'}`}
                                                             >
-                                                                {isSubmitted ? 'Work Handed In' : 'Submit Work'}
+                                                                {isGraded ? 'Work Handed In' : isSubmitted ? 'Update Your Work' : 'Submit Work'}
                                                             </button>
                                                             <button
                                                                 onClick={() => generateAssignmentPDF(assignment)}
@@ -480,6 +497,79 @@ const CourseDetail = () => {
                                 ) : (
                                     <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-100">
                                         <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No assignments available yet.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'quizzes' && (
+                            <div>
+                                <div className="mb-8">
+                                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Interactive Quizzes</h2>
+                                    <p className="text-gray-500 font-medium mt-1">Manage assessments and automated competency checks</p>
+                                </div>
+                                {course.quizzes?.length ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {course.quizzes.map((quiz) => {
+                                            const submissions = (course.quiz_submissions || []).filter(s => s.quiz === quiz.id);
+                                            const attemptsUsed = submissions.length;
+                                            const isLimitReached = attemptsUsed >= (quiz.max_attempts || 1);
+                                            const highestScore = submissions.length > 0 ? Math.max(...submissions.map(s => s.score)) : null;
+
+                                            return (
+                                                <div key={quiz.id} className="bg-white rounded-3xl border border-gray-100 p-6 hover:shadow-xl hover:shadow-indigo-900/5 transition-all group relative overflow-hidden">
+                                                    <div className="flex-1 space-y-4">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex items-center space-x-2">
+                                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest rounded">Quiz</span>
+                                                                {isLimitReached ? (
+                                                                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded flex items-center gap-1">
+                                                                        Completed
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded flex items-center gap-1">
+                                                                        Live
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {highestScore !== null && (
+                                                                <div className="bg-[#18216D] px-3 py-1.5 rounded-xl shadow-lg shadow-indigo-900/10 border border-white/10 text-center animate-in zoom-in duration-300">
+                                                                    <div className="text-[7px] font-black text-indigo-200 uppercase tracking-widest leading-none mb-1">Score</div>
+                                                                    <div className="text-sm font-black text-white leading-none">
+                                                                        {highestScore}/{quiz.total_points || 0}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <h3 className="text-xl font-black text-[#18216D] leading-tight line-clamp-2 min-h-[3.5rem]">{quiz.title}</h3>
+
+                                                        <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <i className="far fa-clock text-[#FFC425]" />
+                                                                {quiz.time_limit_minutes} Mins
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 text-indigo-400">
+                                                                <i className="fas fa-layer-group" />
+                                                                {attemptsUsed} / {quiz.max_attempts || 1} Attempts
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            onClick={() => !isLimitReached && setTakingQuiz(quiz)}
+                                                            className={`w-full py-4 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-sm ${isLimitReached
+                                                                ? 'bg-[#FFC425] text-[#18216D] hover:bg-[#E5B022]'
+                                                                : 'bg-slate-50 text-[#18216D] group-hover:bg-[#18216D] group-hover:text-white'}`}
+                                                        >
+                                                            {isLimitReached ? 'Review Result' : 'Start Assessment'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-100">
+                                        <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No assessments assigned yet.</p>
                                     </div>
                                 )}
                             </div>
@@ -509,73 +599,102 @@ const CourseDetail = () => {
 
                                 {submissionView === 'chart' ? (
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm h-80">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Engagement Split</p>
+                                        <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm h-80 flex flex-col items-center justify-center relative">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 w-full">Task Completion</p>
+                                            <div className="absolute inset-x-0 bottom-1/2 translate-y-6 flex flex-col items-center justify-center pointer-events-none">
+                                                <span className="text-4xl font-black text-[#18216D] leading-none">{completionStats[2].percentage}%</span>
+                                                <span className="text-[8px] font-black text-slate-300 uppercase mt-1 tracking-widest">Mastery</span>
+                                            </div>
                                             <ResponsiveContainer width="100%" height="80%">
-                                                <RadialBarChart innerRadius="40%" outerRadius="90%" data={submissionChartData}>
-                                                    <RadialBar minAngle={15} cornerRadius={10} clockWise dataKey="value" fill="#18216D" />
-                                                    <Tooltip />
+                                                <RadialBarChart
+                                                    innerRadius="70%"
+                                                    outerRadius="100%"
+                                                    data={completionStats.slice(0, 2)}
+                                                    startAngle={90}
+                                                    endAngle={450}
+                                                >
+                                                    <RadialBar
+                                                        minAngle={15}
+                                                        cornerRadius={20}
+                                                        clockWise
+                                                        dataKey="value"
+                                                    />
                                                 </RadialBarChart>
                                             </ResponsiveContainer>
                                         </div>
                                         <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm h-80">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Submission Timeline</p>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Performance Timeline</p>
                                             <ResponsiveContainer width="100%" height="80%">
                                                 <AreaChart data={submissionTimeline}>
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                                    <XAxis dataKey="date" stroke="#94a3b8" />
-                                                    <YAxis allowDecimals={false} stroke="#94a3b8" />
-                                                    <Tooltip />
-                                                    <Area type="monotone" dataKey="Attempts" stroke="#FFC425" fill="#FFC42533" strokeWidth={3} />
+                                                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} fontWeights="black" />
+                                                    <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={10} />
+                                                    <Tooltip
+                                                        contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 30px -5px rgba(24,33,109,0.1)' }}
+                                                        labelStyle={{ fontWeight: 'black', textTransform: 'uppercase', fontSize: '10px', color: '#18216D' }}
+                                                    />
+                                                    <Area type="monotone" dataKey="Performance" stroke="#18216D" fill="#18216D11" strokeWidth={4} />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
-                                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 px-2">Knowledge Checks (Quizzes)</h3>
-                                            {submissionData.quizzes?.length ? (
-                                                <div className="space-y-3">
-                                                    {submissionData.quizzes.map((sub) => (
-                                                        <div key={sub.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-black text-[#18216D] truncate">{sub.quiz_title || `Quiz #${sub.quiz}`}</p>
-                                                                <p className="text-[9px] font-black text-slate-400 uppercase mt-1">{sub.status}</p>
-                                                            </div>
-                                                            <div className="text-right ml-4">
-                                                                <span className="text-lg font-black text-[#18216D]">{sub.score ?? '--'}</span>
-                                                                <span className="text-[9px] font-black text-slate-400 uppercase block">PTS</span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-400 text-xs italic px-2">No quiz attempts yet.</p>
-                                            )}
-                                        </div>
-                                        <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
-                                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 px-2">Classroom Tasks (Assignments)</h3>
-                                            {submissionData.assignments?.length ? (
-                                                <div className="space-y-3">
-                                                    {submissionData.assignments.map((sub) => (
-                                                        <div key={sub.id} className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                                                            <div className="min-w-0">
-                                                                <p className="text-sm font-black text-[#18216D] truncate">{sub.assignment_title || `Assignment #${sub.assignment}`}</p>
-                                                                <p className="text-[9px] font-black text-slate-400 uppercase mt-1">
-                                                                    {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : '--'}
-                                                                </p>
-                                                            </div>
-                                                            <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-100">
-                                                                <span className="text-[9px] font-black text-[#18216D] uppercase">{sub.graded ? 'Graded' : 'Pending'}</span>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-gray-400 text-xs italic px-2">No work submitted yet.</p>
-                                            )}
-                                        </div>
+                                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="bg-slate-50">
+                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Activity Name</th>
+                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
+                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Submission Date</th>
+                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                                    <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Grade / Result</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {[...submissionData.assignments.map(a => ({ ...a, type: 'Assignment' })), ...submissionData.quizzes.map(q => ({ ...q, type: 'Quiz' }))].sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at)).map((record, idx) => {
+                                                    const statusLabel = (record.status || 'SUBMITTED').toUpperCase().replace('_', ' ');
+                                                    const isGraded = ['GRADED', 'AUTO GRADED'].includes(statusLabel);
+
+                                                    return (
+                                                        <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                                            <td className="px-8 py-5">
+                                                                <p className="text-sm font-black text-[#18216D] transition-colors">{record.assignment_title || record.quiz_title || record.title}</p>
+                                                            </td>
+                                                            <td className="px-8 py-5">
+                                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${record.type === 'Assignment' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                                    {record.type}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-8 py-5 text-xs font-bold text-slate-400">
+                                                                {new Date(record.submitted_at).toLocaleDateString()}
+                                                            </td>
+                                                            <td className="px-8 py-5">
+                                                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isGraded ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                                    {statusLabel}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-8 py-5 text-right">
+                                                                <div className="font-black text-[#18216D]">
+                                                                    {record.competency_level || record.grade || (record.score != null ? `${record.score} pts` : '--')}
+                                                                </div>
+                                                                {(record.competency_comment || record.feedback) && (
+                                                                    <p className="text-[8px] text-slate-400 italic mt-1 max-w-[200px] ml-auto truncate" title={record.competency_comment || record.feedback}>
+                                                                        "{record.competency_comment || record.feedback}"
+                                                                    </p>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {(!submissionData.assignments.length && !submissionData.quizzes.length) && (
+                                                    <tr>
+                                                        <td colSpan="5" className="px-8 py-20 text-center">
+                                                            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No submission records found yet.</p>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 )}
                             </div>
@@ -619,57 +738,6 @@ const CourseDetail = () => {
                             </div>
                         )}
 
-                        {activeTab === 'schedule' && (
-                            <div>
-                                <div className="mb-8">
-                                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Live Sessions</h2>
-                                    <p className="text-gray-500 font-medium mt-1">Upcoming virtual classes and session recordings</p>
-                                </div>
-                                {course.schedules?.length ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {course.schedules.map((schedule) => (
-                                            <div key={schedule.id} className="bg-white border border-gray-100 rounded-3xl p-6 flex flex-col justify-between group">
-                                                <div className="mb-6">
-                                                    <div className="flex items-center space-x-2 text-[10px] font-black text-[#FFC425] uppercase tracking-[0.2em] mb-2">
-                                                        <i className="fas fa-calendar-day" />
-                                                        <span>{schedule.day}</span>
-                                                    </div>
-                                                    <h3 className="text-2xl font-black text-[#18216D]">{schedule.start_time} – {schedule.end_time}</h3>
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    {schedule.meeting_link && (
-                                                        <a
-                                                            href={schedule.meeting_link}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex-1 px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest bg-[#18216D] text-white hover:bg-[#0D164F] flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/10"
-                                                        >
-                                                            <i className="fas fa-video text-xs" />
-                                                            Enter Classroom
-                                                        </a>
-                                                    )}
-                                                    {schedule.recording_link && (
-                                                        <a
-                                                            href={schedule.recording_link}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-50 text-slate-400 hover:text-[#18216D] flex items-center justify-center gap-2"
-                                                        >
-                                                            <i className="fas fa-play-circle text-xs" />
-                                                            Record
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-100">
-                                        <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No scheduled live sessions for this week.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </main>
             </div>
@@ -678,6 +746,7 @@ const CourseDetail = () => {
             {submittingAssignment && (
                 <AssignmentSubmission
                     assignment={submittingAssignment}
+                    hasSubmitted={(course.assignment_submissions || []).some(s => s.assignment === submittingAssignment.id)}
                     onClose={() => setSubmittingAssignment(null)}
                     onSubmit={() => window.location.reload()}
                 />

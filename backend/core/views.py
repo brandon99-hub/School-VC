@@ -7,7 +7,7 @@ from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Announcement, Notification, AcademicYear  # No TeacherProfile or StudentProfile here
-from students.models import Student
+from students.models import Student, Parent
 from teachers.models import Teacher
 from courses.models import Course
 from django.db.models import Count
@@ -26,6 +26,8 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.middleware.csrf import get_token
 import logging
+from .email_utils import send_welcome_email
+from rest_framework.decorators import api_view, permission_classes
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,15 @@ class UserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if hasattr(request.user, '_is_parent') and request.user._is_parent:
+            return Response({
+                'id': request.user.id,
+                'email': request.user.email,
+                'first_name': request.user.first_name,
+                'last_name': request.user.last_name,
+                'role': 'parent',
+                'system_id': f"PAR-{request.user.id:03d}"
+            })
         user_data = UserSerializer(request.user).data
         user_data['role'] = get_user_role(request.user)
         if hasattr(request.user, 'teacher'):
@@ -101,6 +112,35 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         )
 
         if not user:
+            # Try Parent authentication
+            try:
+                parent = Parent.objects.get(email=email, is_active=True)
+                if parent.check_password(password):
+                    logger.debug(f"Authenticated parent: {parent.email}")
+                    # Manually generate tokens for parent
+                    refresh = RefreshToken()
+                    refresh['parent_id'] = parent.id
+                    refresh['email'] = parent.email
+                    refresh['user_type'] = 'parent'
+                    refresh['first_name'] = parent.first_name
+                    refresh['last_name'] = parent.last_name
+                    
+                    return {
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                        'user': {
+                            'id': parent.id,
+                            'first_name': parent.first_name,
+                            'last_name': parent.last_name,
+                            'name': parent.get_full_name(),
+                            'email': parent.email,
+                            'role': 'parent',
+                            'system_id': f"PAR-{parent.id:03d}"
+                        }
+                    }
+            except Parent.DoesNotExist:
+                pass
+
             logger.debug(f"Authentication failed for email: {email}")
             raise AuthenticationFailed('Invalid credentials')
 
@@ -131,6 +171,9 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Parents don't have notifications yet in this schema
+        if hasattr(self.request.user, '_is_parent'):
+            return Notification.objects.none()
         return Notification.objects.filter(user=self.request.user)
 
 
@@ -191,7 +234,6 @@ def login_view(request):
     return render(request, 'core/login.html')
 
 
-@login_required
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -361,5 +403,165 @@ def admin_users(request):
             'system_id': user.student_id if hasattr(user, 'student_id') else None,
             'grade_level': user.grade_level.name if hasattr(user, 'grade_level') and user.grade_level else None,
         })
+
+    # Process Parents
+    from students.models import Parent
+    parents = Parent.objects.all()
+    for parent in parents:
+        data.append({
+            'id': f"parent_{parent.id}",
+            'db_id': parent.id,
+            'name': parent.get_full_name() or parent.email,
+            'email': parent.email,
+            'role': 'parent',
+            'username': parent.email, # Parents use email as username
+            'date_joined': parent.created_at,
+            'is_active': parent.is_active,
+            'system_id': 'PAR-' + str(parent.id).zfill(3),
+            'children_count': parent.children.count(),
+            'child_ids': list(parent.children.values_list('id', flat=True))
+        })
             
     return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_add_user(request):
+    """Admin-only endpoint to create Teachers or Students and send welcome emails"""
+    if not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    role = request.data.get('role')
+    password = request.data.get('password')
+    email = request.data.get('email')
+    first_name = request.data.get('first_name')
+    last_name = request.data.get('last_name')
+    
+    if not all([role, email, first_name, last_name, password]):
+        return Response({'error': 'All fields are required'}, status=400)
+        
+    if role == 'parent':
+        from students.models import Parent
+        if Parent.objects.filter(email=email).exists():
+            return Response({'error': 'Parent with this email already exists'}, status=400)
+        
+        parent = Parent.objects.create(
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            phone=request.data.get('phone', ''),
+            address=request.data.get('address', '')
+        )
+        parent.set_password(password)
+        
+        student_ids = request.data.get('student_ids', [])
+        if student_ids:
+            if isinstance(student_ids, str):
+                ids = [int(i.strip()) for i in student_ids.split(',') if i.strip().isdigit()]
+            else:
+                ids = [int(i) for i in student_ids if str(i).isdigit()]
+            students = Student.objects.filter(id__in=ids)
+            parent.children.set(students)
+        
+        parent.save()
+        
+        # Send welcome email
+        send_welcome_email(
+            user_email=email,
+            first_name=first_name,
+            password=password,
+            role=role
+        )
+        
+        return Response({
+            'message': 'Parent registered successfully',
+            'user': {
+                'id': parent.id,
+                'email': parent.email,
+                'role': 'parent'
+            }
+        }, status=201)
+
+    serializer = DynamicUserRegistrationSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        
+        # Send welcome email using the plain password from request
+        send_welcome_email(
+            user_email=email,
+            first_name=first_name,
+            password=password,
+            role=role
+        )
+        
+        return Response({
+            'message': f'{role.capitalize()} created successfully and welcome email sent.',
+            'user': UserSerializer(user).data
+        }, status=201)
+    
+    return Response(serializer.errors, status=400)
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def admin_update_user(request, user_id):
+    """Admin-only endpoint to update user details across all roles"""
+    if not request.user.is_superuser:
+        return Response({'error': 'Permission denied'}, status=403)
+    
+    role_parts = user_id.split('_')
+    if len(role_parts) < 2:
+        return Response({'error': 'Invalid user ID format'}, status=400)
+    
+    role, pk = role_parts[0], role_parts[1]
+    
+    try:
+        if role == 'teacher':
+            teacher = Teacher.objects.get(id=pk)
+            user = teacher.user
+            user.first_name = request.data.get('first_name', user.first_name)
+            user.last_name = request.data.get('last_name', user.last_name)
+            user.email = request.data.get('email', user.email)
+            user.save()
+            teacher.phone = request.data.get('phone', teacher.phone)
+            teacher.address = request.data.get('address', teacher.address)
+            teacher.specialization = request.data.get('specialization', teacher.specialization)
+            teacher.save()
+            return Response({'message': 'Teacher updated successfully'})
+            
+        elif role == 'student' or role == 'admin':
+            student = Student.objects.get(id=pk)
+            student.first_name = request.data.get('first_name', student.first_name)
+            student.last_name = request.data.get('last_name', student.last_name)
+            student.email = request.data.get('email', student.email)
+            student.phone = request.data.get('phone', student.phone)
+            student.address = request.data.get('address', student.address)
+            if role == 'student':
+                student.grade = request.data.get('grade', student.grade)
+            student.save()
+            return Response({'message': f'{role.capitalize()} updated successfully'})
+            
+        elif role == 'parent':
+            from students.models import Parent
+            parent = Parent.objects.get(id=pk)
+            parent.first_name = request.data.get('first_name', parent.first_name)
+            parent.last_name = request.data.get('last_name', parent.last_name)
+            parent.email = request.data.get('email', parent.email)
+            parent.phone = request.data.get('phone', parent.phone)
+            parent.address = request.data.get('address', parent.address)
+            
+            student_ids = request.data.get('student_ids')
+            if student_ids is not None:
+                if isinstance(student_ids, str):
+                    ids = [int(i.strip()) for i in student_ids.split(',') if i.strip().isdigit()]
+                else:
+                    ids = [int(i) for i in student_ids if str(i).isdigit()]
+                students = Student.objects.filter(id__in=ids)
+                parent.children.set(students)
+                
+            parent.save()
+            return Response({'message': 'Parent updated successfully'})
+            
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
+    
+    return Response({'error': 'Invalid role'}, status=400)

@@ -34,16 +34,14 @@ const Navbar = () => {
     const quickLinks = useMemo(() => {
         const role = user?.role || 'student';
         const shared = [
-            { to: '/settings', label: 'Settings', icon: 'fa-sliders', roles: ['student', 'teacher'] },
-            { to: '/profile', label: 'Profile', icon: 'fa-id-badge', roles: ['student', 'teacher'] },
+            { to: '/settings', label: 'My Account', icon: 'fa-user-gear', roles: ['student', 'teacher'] },
         ];
         const studentLinks = [
             { to: '/courses', label: 'Learning Areas', icon: 'fa-layer-group', roles: ['student'] },
-            { to: '/attendance', label: 'Attendance', icon: 'fa-calendar-check', roles: ['student'] },
+            { to: '/success-hub', label: 'Success Hub', icon: 'fa-graduation-cap', roles: ['student'] },
         ];
         const teacherLinks = [
-            { to: '/dashboard?view=teaching', label: 'Teaching Overview', icon: 'fa-chalkboard', roles: ['teacher'] },
-            { to: '/teacher-attendance', label: 'Class Attendance', icon: 'fa-user-check', roles: ['teacher'] },
+            { to: '/teacher/courses', label: 'My Learning Areas', icon: 'fa-layer-group', roles: ['teacher'] },
         ];
         return [...shared, ...(role === 'teacher' ? teacherLinks : studentLinks)].filter((link) =>
             link.roles.includes(role)

@@ -5,15 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import client from '../../api/Client';
 
-const highlights = [
-    'Secure role-based access for students, teachers, and admins.',
-    'Real-time attendance, grading, and scheduling tools.',
-    'Modern LMS experience with lessons, quizzes, and discussions.',
-];
-
-const inputBase =
-    'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition disabled:bg-gray-50 disabled:text-gray-400';
-
 const Login = () => {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [loading, setLoading] = useState(false);
@@ -63,138 +54,136 @@ const Login = () => {
                 navigate('/admin/dashboard');
             } else if (role === 'teacher') {
                 navigate('/teacher/dashboard');
+            } else if (role === 'parent') {
+                navigate('/parent/dashboard');
             } else {
                 navigate('/dashboard');
             }
         } catch (err) {
             const message = err.response?.data?.detail || 'Invalid credentials. Please try again.';
             setError(message);
-            console.error('Login error:', err.response?.data || err);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleForgotPassword = (e) => {
-        e.preventDefault();
-        // Placeholder for future password reset flow.
-    };
-
     return (
-        <div className="min-h-screen bg-slate-50 grid grid-cols-1 lg:grid-cols-2">
-            <section className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-indigo-600 to-blue-500 p-12 text-white">
-                <div>
-                    <p className="text-sm uppercase tracking-wider text-white/70 font-semibold">School OS</p>
-                    <h1 className="text-4xl font-bold mt-4 max-w-md leading-snug">
-                        A connected learning platform for modern schools.
+        <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+            {/* Branding Side */}
+            <div className="lg:w-1/2 bg-[#18216D] p-12 flex flex-col justify-between text-white relative overflow-hidden">
+                <div className="z-10">
+                    <div className="flex items-center gap-3 mb-12">
+                        <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center">
+                            <i className="fas fa-graduation-cap text-[#18216D] text-2xl"></i>
+                        </div>
+                        <span className="text-2xl font-black tracking-tight uppercase">Kianda<span className="text-[#FFC425]">OS</span></span>
+                    </div>
+
+                    <h1 className="text-5xl font-black mb-6 leading-tight max-w-lg">
+                        Kianda School <br />
+                        <span className="text-[#FFC425]">Internal Portal</span>
                     </h1>
-                    <p className="mt-4 text-white/80 max-w-lg">
-                        One login unlocks LMS insights, SIS records, communication tools, and AI copilots tailored for
-                        every role.
+                    <p className="text-xl text-blue-100/80 max-w-md leading-relaxed">
+                        Welcome to the official Kianda School management portal. Access your academic records,
+                        schedules, and learning resources in one unified platform.
                     </p>
                 </div>
-                <ul className="space-y-4 text-sm text-white/80">
-                    {highlights.map((item) => (
-                        <li key={item} className="flex items-start gap-3">
-                            <span className="mt-1 h-6 w-6 flex items-center justify-center rounded-full bg-white/20 text-white">
-                                <i className="fas fa-check" />
-                            </span>
-                            {item}
-                        </li>
-                    ))}
-                </ul>
-                <div className="text-sm text-white/70">
-                    Need help? <span className="font-semibold text-white">support@schoolos.com</span>
-                </div>
-            </section>
 
-            <main className="flex items-center justify-center py-12 px-6 lg:px-12">
-                <div className="w-full max-w-md space-y-8">
-                    <div className="space-y-2 text-center">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Welcome back</p>
-                        <h2 className="text-3xl font-bold text-gray-900">Sign in to continue</h2>
-                        <p className="text-sm text-gray-500">Enter your credentials to pick up where you left off.</p>
+                <div className="z-10 mt-12 grid grid-cols-2 gap-8 border-t border-white/10 pt-12">
+                    <div>
+                        <p className="text-[#FFC425] font-black uppercase text-xs tracking-widest mb-2">Academic Hub</p>
+                        <p className="text-sm text-blue-100/60">Real-time progress tracking and resource management.</p>
                     </div>
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-6">
-                        {error && (
-                            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                                {error}
-                            </div>
-                        )}
-                        <form className="space-y-5" onSubmit={handleSubmit}>
-                            <div className="space-y-2">
-                                <label htmlFor="email" className="text-sm font-semibold text-gray-700">
-                                    Email
-                                </label>
+                    <div>
+                        <p className="text-[#FFC425] font-black uppercase text-xs tracking-widest mb-2">Secure Access</p>
+                        <p className="text-sm text-blue-100/60">State-of-the-art encryption for your personal data.</p>
+                    </div>
+                </div>
+
+                {/* Decorative Elements */}
+                <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute top-40 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
+            </div>
+
+            {/* Login Side */}
+            <div className="lg:w-1/2 flex items-center justify-center p-8 bg-slate-50">
+                <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl shadow-indigo-900/10 border border-slate-100 p-10 lg:p-12">
+                    <div className="mb-10 text-center lg:text-left">
+                        <h2 className="text-3xl font-black text-[#18216D]">Sign In</h2>
+                        <p className="text-slate-400 font-bold text-sm mt-2">Enter your school email and password.</p>
+                    </div>
+
+                    {error && (
+                        <div className="mb-6 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl text-sm font-bold flex items-center gap-3">
+                            <i className="fas fa-circle-exclamation"></i>
+                            {error}
+                        </div>
+                    )}
+
+                    <form className="space-y-6" onSubmit={handleSubmit}>
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Email Address</label>
+                            <div className="relative">
+                                <i className="far fa-envelope absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
                                 <input
-                                    id="email"
-                                    name="email"
                                     type="email"
-                                    autoComplete="email"
+                                    name="email"
                                     required
-                                    disabled={loading}
                                     value={formData.email}
                                     onChange={handleChange}
-                                    className={inputBase}
-                                    placeholder="you@yourschool.com"
+                                    disabled={loading}
+                                    className="w-full pl-14 pr-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D] placeholder-slate-300"
+                                    placeholder="yourname@kianda.ac.ke"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label htmlFor="password" className="text-sm font-semibold text-gray-700">
-                                    Password
-                                </label>
+                        </div>
+
+                        <div>
+                            <div className="flex justify-between items-center mb-2 ml-1">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Password</label>
+                                <button type="button" className="text-[10px] font-black uppercase tracking-widest text-[#18216D]/60 hover:text-[#18216D]">Forgot Key?</button>
+                            </div>
+                            <div className="relative">
+                                <i className="fas fa-lock absolute left-5 top-1/2 -translate-y-1/2 text-slate-300"></i>
                                 <input
-                                    id="password"
-                                    name="password"
                                     type="password"
-                                    autoComplete="current-password"
+                                    name="password"
                                     required
-                                    disabled={loading}
                                     value={formData.password}
                                     onChange={handleChange}
-                                    className={inputBase}
+                                    disabled={loading}
+                                    className="w-full pl-14 pr-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D] placeholder-slate-300"
                                     placeholder="••••••••"
                                 />
                             </div>
-                            <div className="flex items-center justify-between text-sm">
-                                <label className="flex items-center gap-2 text-gray-600">
-                                    <input
-                                        type="checkbox"
-                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                        disabled={loading}
-                                    />
-                                    Remember me
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={handleForgotPassword}
-                                    disabled={loading}
-                                    className="font-semibold text-indigo-600 hover:text-indigo-500"
-                                >
-                                    Forgot password?
-                                </button>
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className={`w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${loading ? 'cursor-not-allowed opacity-70' : ''
-                                    }`}
-                            >
-                                {loading ? 'Signing in...' : 'Sign in'}
-                            </button>
-                        </form>
-                        <div className="text-center text-sm text-gray-500">
-                            New to School OS?{' '}
-                            <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
-                                Create an account
-                            </Link>
                         </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className={`w-full py-5 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:bg-[#0D164F] hover:-translate-y-1 transition-all flex items-center justify-center gap-3 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        >
+                            {loading ? (
+                                <>
+                                    <i className="fas fa-circle-notch fa-spin"></i>
+                                    Signing in...
+                                </>
+                            ) : (
+                                <>
+                                    <span>Sign In</span>
+                                    <i className="fas fa-arrow-right"></i>
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    <div className="mt-10 pt-10 border-t border-slate-50 text-center">
+                        <p className="text-slate-400 text-sm font-medium">
+                            New user? <Link to="/signup" className="text-[#18216D] font-black hover:underline underline-offset-4">Create Institution Account</Link>
+                        </p>
                     </div>
-                    <p className="text-xs text-center text-gray-400">
-                        By continuing you agree to the Acceptable Use Policy and Privacy Statement.
-                    </p>
                 </div>
-            </main>
+            </div>
         </div>
     );
 };

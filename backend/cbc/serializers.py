@@ -25,14 +25,24 @@ class LearningAreaListSerializer(serializers.ModelSerializer):
     grade_level_name = serializers.CharField(source='grade_level.name', read_only=True)
     teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
     student_count = serializers.IntegerField(source='get_enrolled_students_count', read_only=True)
+    strands_count = serializers.SerializerMethodField()
+    outcomes_count = serializers.SerializerMethodField()
     
     class Meta:
         model = LearningArea
         fields = [
             'id', 'name', 'code', 'grade_level', 'grade_level_name',
-            'teacher', 'teacher_name', 'student_count', 'is_active'
+            'teacher', 'teacher_name', 'student_count', 'is_active',
+            'strands_count', 'outcomes_count'
         ]
-        read_only_fields = ['id', 'grade_level_name', 'teacher_name', 'student_count']
+        read_only_fields = ['id', 'grade_level_name', 'teacher_name', 'student_count', 'strands_count', 'outcomes_count']
+
+    def get_strands_count(self, obj):
+        return obj.strands.count()
+    
+    def get_outcomes_count(self, obj):
+        from .models import LearningOutcome
+        return LearningOutcome.objects.filter(sub_strand__strand__learning_area=obj).count()
 
 
 class LearningAreaDetailSerializer(serializers.ModelSerializer):
@@ -40,6 +50,8 @@ class LearningAreaDetailSerializer(serializers.ModelSerializer):
     grade_level = GradeLevelSerializer(read_only=True)
     teacher_name = serializers.CharField(source='teacher.user.get_full_name', read_only=True)
     student_count = serializers.IntegerField(source='get_enrolled_students_count', read_only=True)
+    strands_count = serializers.SerializerMethodField()
+    outcomes_count = serializers.SerializerMethodField()
     strands = serializers.SerializerMethodField()
     
     class Meta:
@@ -47,12 +59,19 @@ class LearningAreaDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'code', 'description', 'grade_level', 'teacher',
             'teacher_name', 'students', 'student_count', 'is_active',
-            'strands', 'created_at', 'updated_at', 'is_cbc'
+            'strands', 'strands_count', 'outcomes_count', 'created_at', 'updated_at', 'is_cbc'
         ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'teacher_name', 'student_count', 'is_cbc', 'strands', 'strands_count', 'outcomes_count']
     
+    def get_strands_count(self, obj):
+        return obj.strands.count()
+    
+    def get_outcomes_count(self, obj):
+        from .models import LearningOutcome
+        return LearningOutcome.objects.filter(sub_strand__strand__learning_area=obj).count()
+
     def get_strands(self, obj):
         return StrandDetailSerializer(obj.strands.all(), many=True).data
-        read_only_fields = ['id', 'created_at', 'updated_at', 'teacher_name', 'student_count', 'is_cbc']
 
 
 class StrandListSerializer(serializers.ModelSerializer):
@@ -78,11 +97,12 @@ class SubStrandListSerializer(serializers.ModelSerializer):
 class LearningOutcomeListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing Learning Outcomes"""
     sub_strand_name = serializers.CharField(source='sub_strand.name', read_only=True)
+    sub_strand_id = serializers.IntegerField(source='sub_strand.id', read_only=True)
     
     class Meta:
         model = LearningOutcome
-        fields = ['id', 'code', 'description', 'sub_strand', 'sub_strand_name', 'order']
-        read_only_fields = ['id', 'sub_strand_name']
+        fields = ['id', 'code', 'description', 'sub_strand', 'sub_strand_id', 'sub_strand_name', 'order']
+        read_only_fields = ['id', 'sub_strand_name', 'sub_strand_id']
 
 
 class LearningOutcomeDetailSerializer(serializers.ModelSerializer):

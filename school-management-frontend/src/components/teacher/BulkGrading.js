@@ -99,15 +99,27 @@ const BulkGrading = () => {
         try {
             const currentSubmission = submissions[currentIndex];
 
-            // Save competency assessment
-            await axios.post('/api/cbc/competency-assessments/', {
-                student: currentSubmission.student.id,
-                learning_outcome: assignment.learning_outcome,
-                competency_level: formData.competency_level,
-                teacher_comment: formData.teacher_comment,
-                evidence: formData.evidence,
-                assignment_submission: currentSubmission.id
-            });
+            // Handle multiple outcomes: Combine primary outcome and tested outcomes
+            const outcomeMap = new Map();
+            if (assignment.learning_outcome) {
+                outcomeMap.set(assignment.learning_outcome, { id: assignment.learning_outcome });
+            }
+            if (assignment.tested_outcomes_detail?.length > 0) {
+                assignment.tested_outcomes_detail.forEach(o => outcomeMap.set(o.id, o));
+            }
+            const outcomes = Array.from(outcomeMap.values());
+
+            // Save competency assessment for each outcome
+            for (const outcome of outcomes) {
+                await axios.post('/api/cbc/competency-assessments/', {
+                    student: currentSubmission.student.id,
+                    learning_outcome: outcome.id,
+                    competency_level: formData.competency_level,
+                    teacher_comment: formData.teacher_comment,
+                    evidence: `Assignment: ${assignment.title}`,
+                    assignment_submission: currentSubmission.id
+                });
+            }
 
             // Update session progress
             await axios.post(`/api/cbc/bulk-grading/${session.id}/update-progress/`);
@@ -269,8 +281,8 @@ const BulkGrading = () => {
                                         type="button"
                                         onClick={() => setFormData({ ...formData, competency_level: level.value })}
                                         className={`p-4 rounded-lg border-2 transition-all ${formData.competency_level === level.value
-                                                ? `border-${level.color}-500 bg-${level.color}-50`
-                                                : 'border-gray-300 hover:border-gray-400'
+                                            ? `border-${level.color}-500 bg-${level.color}-50`
+                                            : 'border-gray-300 hover:border-gray-400'
                                             }`}
                                     >
                                         <div className="font-semibold">{level.value}</div>

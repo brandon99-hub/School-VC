@@ -5,7 +5,6 @@ import LearningOutcomeSelector from './LearningOutcomeSelector';
 import {
     PlusIcon,
     TrashIcon,
-    CheckCircleIcon,
     XMarkIcon,
     Bars3Icon
 } from '@heroicons/react/24/outline';
@@ -14,13 +13,26 @@ import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/sol
 const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
     const { get, post, put, del } = useApi();
     const { showToast } = useAppState();
-    const isEditMode = Boolean(quiz);
     const [submitting, setSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState('settings'); // 'settings' or 'questions'
     const [savedQuiz, setSavedQuiz] = useState(quiz);
 
+    const [strands, setStrands] = useState([]);
     const [selectedStrand, setSelectedStrand] = useState(quiz?.strand_id || null);
-    const [selectedOutcome, setSelectedOutcome] = useState(quiz?.learning_outcome ? { id: quiz.learning_outcome, description: quiz.learning_outcome_description } : null);
+    const [selectedOutcomes, setSelectedOutcomes] = useState(
+        quiz?.tested_outcomes_detail?.length > 0
+            ? quiz.tested_outcomes_detail.map(o => ({
+                id: o.id,
+                description: o.description,
+                code: o.code,
+                sub_strand_id: o.sub_strand_id
+            }))
+            : (quiz?.learning_outcome ? [{
+                id: quiz.learning_outcome,
+                description: quiz.learning_outcome_description || 'Selected Outcome',
+                sub_strand_id: quiz.sub_strand_id
+            }] : [])
+    );
 
     const [formData, setFormData] = useState({
         title: quiz?.title || '',
@@ -28,6 +40,7 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
         time_limit_minutes: quiz?.time_limit_minutes || 0,
         max_attempts: quiz?.max_attempts || 1,
         is_published: quiz?.is_published || false,
+        due_date: quiz?.due_date ? new Date(quiz.due_date).toISOString().slice(0, 16) : '',
     });
 
     const [questions, setQuestions] = useState(quiz?.questions || []);
@@ -37,7 +50,40 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
         if (quiz?.questions) {
             setQuestions(quiz.questions);
         }
-    }, [quiz]);
+
+        // Sync outcomes when quiz prop changes or is loaded
+        if (quiz) {
+            if (quiz.tested_outcomes_detail?.length > 0) {
+                setSelectedOutcomes(quiz.tested_outcomes_detail.map(o => ({
+                    id: o.id,
+                    description: o.description,
+                    code: o.code,
+                    sub_strand_id: o.sub_strand_id
+                })));
+            } else if (quiz.learning_outcome) {
+                setSelectedOutcomes([{
+                    id: quiz.learning_outcome,
+                    description: quiz.learning_outcome_description || 'Selected Outcome',
+                    sub_strand_id: quiz.sub_strand_id
+                }]);
+            }
+
+            if (quiz.strand_id) {
+                setSelectedStrand(quiz.strand_id);
+            }
+        }
+
+        // Fetch strands for selector
+        const fetchStrands = async () => {
+            try {
+                const response = await get(`/api/cbc/learning-areas/${courseId}/strands/`);
+                setStrands(Array.isArray(response) ? response : []);
+            } catch (error) {
+                console.error('Error fetching strands:', error);
+            }
+        };
+        fetchStrands();
+    }, [quiz, courseId, get]);
 
     const handleSettingsChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -55,16 +101,17 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
                 ...formData,
                 lesson: lessonId,
                 learning_area: courseId,
-                learning_outcome: selectedOutcome?.id
+                learning_outcome: selectedOutcomes[0]?.id, // Fallback
+                tested_outcomes: selectedOutcomes.map(o => o.id)
             };
 
             if (savedQuiz) {
-                const response = await put(`/api/teacher/quizzes/${savedQuiz.id}/`, payload);
+                const response = await put(`/teachers/api/quizzes/${savedQuiz.id}/`, payload);
                 setSavedQuiz(response);
-                showToast('Quiz settings updated!');
-                setActiveTab('questions');
+                showToast('Quiz configuration updated successfully!');
+                onClose(); // Auto-close as requested
             } else {
-                const response = await post(`/api/teacher/lessons/${lessonId}/quizzes/`, payload);
+                const response = await post(`/teachers/api/lessons/${lessonId}/quizzes/`, payload);
                 setSavedQuiz(response);
                 showToast('Quiz created! Now add some questions.');
                 setActiveTab('questions');
@@ -82,7 +129,7 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
         setEditingQuestion({
             prompt: '',
             question_type: 'multiple_choice',
-            choices: ['', '', '', ''],
+            choices: ['', ''], // Start with minimum 2 choices
             correct_answer: 0,
             points: 1,
             order: questions.length + 1
@@ -94,18 +141,34 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
         setSubmitting(true);
         try {
             const quizId = savedQuiz.id;
-            if (editingQuestion.id) {
-                await put(`/api/teacher/quizzes/${quizId}/questions/${editingQuestion.id}/`, editingQuestion);
+            const isNew = !editingQuestion.id;
+
+            if (!isNew) {
+                await put(`/teachers/api/quizzes/${quizId}/questions/${editingQuestion.id}/`, editingQuestion);
                 showToast('Question updated!');
             } else {
-                await post(`/api/teacher/quizzes/${quizId}/questions/`, editingQuestion);
-                showToast('Question added!');
+                await post(`/teachers/api/quizzes/${quizId}/questions/`, editingQuestion);
+                showToast('Question added! You can now add another.');
             }
 
             // Refresh local questions
-            const updatedQuiz = await get(`/api/teacher/quizzes/${quizId}/`);
+            const updatedQuiz = await get(`/teachers/api/quizzes/${quizId}/`);
             setQuestions(updatedQuiz.questions || []);
-            setEditingQuestion(null);
+
+            if (isNew) {
+                // Immediately prepare a fresh form for the next question
+                setEditingQuestion({
+                    prompt: '',
+                    question_type: 'multiple_choice',
+                    choices: ['', ''],
+                    correct_answer: 0,
+                    points: 1,
+                    order: (updatedQuiz.questions?.length || 0) + 1
+                });
+            } else {
+                // If it was an edit, return to the list
+                setEditingQuestion(null);
+            }
             onSave();
         } catch (error) {
             console.error('Error saving question:', error);
@@ -118,9 +181,9 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
     const handleDeleteQuestion = async (qId) => {
         if (!window.confirm('Delete this question?')) return;
         try {
-            await del(`/api/teacher/quizzes/${savedQuiz.id}/questions/${qId}/`);
+            await del(`/teachers/api/quizzes/${savedQuiz.id}/questions/${qId}/`);
             showToast('Question deleted');
-            const updatedQuiz = await get(`/api/teacher/quizzes/${savedQuiz.id}/`);
+            const updatedQuiz = await get(`/teachers/api/quizzes/${savedQuiz.id}/`);
             setQuestions(updatedQuiz.questions || []);
             onSave();
         } catch (error) {
@@ -172,12 +235,36 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
                                     <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs">Curriculum Mapping</h3>
                                 </div>
 
-                                <LearningOutcomeSelector
-                                    learningAreaId={courseId}
-                                    strandId={selectedStrand}
-                                    selectedOutcome={selectedOutcome}
-                                    onChange={setSelectedOutcome}
-                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Curriculum Strand</label>
+                                        <select
+                                            value={selectedStrand || ''}
+                                            onChange={(e) => {
+                                                setSelectedStrand(e.target.value);
+                                                setSelectedOutcomes([]);
+                                            }}
+                                            className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
+                                        >
+                                            <option value="">Select a strand...</option>
+                                            {strands.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {selectedStrand && (
+                                        <div className="md:col-span-2">
+                                            <LearningOutcomeSelector
+                                                learningAreaId={courseId}
+                                                strandId={selectedStrand}
+                                                selectedOutcomes={selectedOutcomes}
+                                                multiple={true}
+                                                onChange={setSelectedOutcomes}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </section>
 
                             <section className="space-y-6">
@@ -219,7 +306,14 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
                                 </div>
                             </div>
 
-                            <div className="bg-[#18216D]/5 p-6 rounded-2xl border border-[#18216D]/10">
+                            <div className="bg-[#18216D]/5 p-6 rounded-2xl border border-[#18216D]/10 space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Assessment Deadline (Due Date)</label>
+                                    <input
+                                        type="datetime-local" name="due_date" value={formData.due_date} onChange={handleSettingsChange}
+                                        className="w-full px-5 py-4 bg-white border-2 border-transparent focus:border-[#18216D] rounded-2xl transition-all font-bold text-gray-900 outline-none"
+                                    />
+                                </div>
                                 <label className="flex items-center space-x-4 cursor-pointer group">
                                     <input
                                         type="checkbox" name="is_published" checked={formData.is_published} onChange={handleSettingsChange}
@@ -261,10 +355,24 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 ml-1">Assessment Options & Key</label>
+                                            <div className="flex items-center justify-between mb-4 ml-1">
+                                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Assessment Options & Key</label>
+                                                {editingQuestion.choices.length < 6 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newChoices = [...editingQuestion.choices, ''];
+                                                            setEditingQuestion({ ...editingQuestion, choices: newChoices });
+                                                        }}
+                                                        className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700"
+                                                    >
+                                                        + Add Option
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="space-y-3">
                                                 {editingQuestion.choices.map((choice, index) => (
-                                                    <div key={index} className="flex items-center space-x-4">
+                                                    <div key={index} className="flex items-center space-x-4 group/choice">
                                                         <button
                                                             type="button"
                                                             onClick={() => setEditingQuestion({ ...editingQuestion, correct_answer: index })}
@@ -272,16 +380,33 @@ const QuizBuilder = ({ lessonId, courseId, quiz, onClose, onSave }) => {
                                                         >
                                                             {editingQuestion.correct_answer === index ? <CheckCircleIconSolid className="w-6 h-6" /> : <div className="w-4 h-4 bg-transparent border-2 border-current rounded-full" />}
                                                         </button>
-                                                        <input
-                                                            type="text" value={choice}
-                                                            onChange={e => {
-                                                                const newChoices = [...editingQuestion.choices];
-                                                                newChoices[index] = e.target.value;
-                                                                setEditingQuestion({ ...editingQuestion, choices: newChoices });
-                                                            }}
-                                                            className={`flex-1 px-5 py-4 border-2 rounded-2xl outline-none transition-all font-bold text-sm ${editingQuestion.correct_answer === index ? 'border-emerald-100 bg-emerald-50/30' : 'border-transparent bg-white shadow-sm'}`}
-                                                            placeholder={`Option ${index + 1}`} required
-                                                        />
+                                                        <div className="flex-1 relative">
+                                                            <input
+                                                                type="text" value={choice}
+                                                                onChange={e => {
+                                                                    const newChoices = [...editingQuestion.choices];
+                                                                    newChoices[index] = e.target.value;
+                                                                    setEditingQuestion({ ...editingQuestion, choices: newChoices });
+                                                                }}
+                                                                className={`w-full px-5 py-4 border-2 rounded-2xl outline-none transition-all font-bold text-sm ${editingQuestion.correct_answer === index ? 'border-emerald-100 bg-emerald-50/30' : 'border-transparent bg-white shadow-sm'}`}
+                                                                placeholder={`Option ${index + 1}`} required
+                                                            />
+                                                            {editingQuestion.choices.length > 2 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newChoices = editingQuestion.choices.filter((_, i) => i !== index);
+                                                                        let newCorrect = editingQuestion.correct_answer;
+                                                                        if (newCorrect === index) newCorrect = 0;
+                                                                        else if (newCorrect > index) newCorrect -= 1;
+                                                                        setEditingQuestion({ ...editingQuestion, choices: newChoices, correct_answer: newCorrect });
+                                                                    }}
+                                                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover/choice:opacity-100 transition-all"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>

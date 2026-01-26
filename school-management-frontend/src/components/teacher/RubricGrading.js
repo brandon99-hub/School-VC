@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
 
@@ -14,20 +14,20 @@ const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) =>
             code: 'EE',
             label: 'Exceeding Expectations',
             color: 'gold',
-            bgColor: 'bg-[#FFC425]/10',
-            borderColor: 'border-[#FFC425]',
-            textColor: 'text-[#18216D]',
-            hoverBorder: 'hover:border-[#FFC425]/50',
+            bgColor: 'bg-amber-50',
+            borderColor: 'border-amber-100',
+            textColor: 'text-amber-600',
+            hoverBorder: 'hover:border-amber-200',
             description: 'Demonstrates mastery and application of competency in novel contexts.'
         },
         {
             code: 'ME',
             label: 'Meeting Expectations',
             color: 'navy',
-            bgColor: 'bg-[#18216D]/5',
-            borderColor: 'border-[#18216D]',
-            textColor: 'text-[#18216D]',
-            hoverBorder: 'hover:border-[#18216D]/50',
+            bgColor: 'bg-indigo-50',
+            borderColor: 'border-indigo-100',
+            textColor: 'text-indigo-700',
+            hoverBorder: 'hover:border-indigo-200',
             description: 'Achieves competency independently and consistently as expected.'
         },
         {
@@ -35,9 +35,9 @@ const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) =>
             label: 'Approaching Expectations',
             color: 'slate',
             bgColor: 'bg-slate-50',
-            borderColor: 'border-slate-300',
+            borderColor: 'border-slate-100',
             textColor: 'text-slate-700',
-            hoverBorder: 'hover:border-slate-400',
+            hoverBorder: 'hover:border-slate-200',
             description: 'Demonstrates progression but requires occasional support or practice.'
         },
         {
@@ -45,12 +45,64 @@ const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) =>
             label: 'Below Expectations',
             color: 'rose',
             bgColor: 'bg-rose-50',
-            borderColor: 'border-rose-200',
+            borderColor: 'border-rose-100',
             textColor: 'text-rose-700',
-            hoverBorder: 'hover:border-rose-300',
+            hoverBorder: 'hover:border-rose-200',
             description: 'Requires significant intervention to achieve the required competency.'
         }
     ];
+
+    const handleSave = useCallback(async (saveAndNext = false) => {
+        if (!competencyLevel) {
+            showToast('Please select a competency level', 'error');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const payload = {
+                competency_level: competencyLevel,
+                competency_comment: comment,
+                status: 'graded'
+            };
+
+            await put(`/api/assignment-submissions/${submission.id}/`, payload);
+
+            // Build a unique list of outcomes to grade (primary + tested)
+            const outcomeMap = new Map();
+            if (assignment.learning_outcome) {
+                outcomeMap.set(assignment.learning_outcome, { id: assignment.learning_outcome });
+            }
+            if (assignment.tested_outcomes_detail?.length > 0) {
+                assignment.tested_outcomes_detail.forEach(o => outcomeMap.set(o.id, o));
+            }
+            const outcomes = Array.from(outcomeMap.values());
+
+            for (const outcome of outcomes) {
+                await post('/api/cbc/competency-assessments/', {
+                    student: submission.student,
+                    learning_outcome: outcome.id,
+                    competency_level: competencyLevel,
+                    teacher: assignment.teacher || submission.teacher,
+                    teacher_comment: comment,
+                    evidence: `Assignment: ${assignment.title}`,
+                    assignment_submission: submission.id
+                });
+            }
+
+            showToast('Assessment Recorded');
+            onGraded();
+
+            if (saveAndNext && hasNext) {
+                onNext();
+            }
+        } catch (error) {
+            console.error('Error saving grade:', error);
+            showToast('Failed to record assessment', 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    }, [competencyLevel, comment, submission.id, submission.student, submission.teacher, assignment.learning_outcome, assignment.title, assignment.teacher, put, post, showToast, onGraded, hasNext, onNext]);
 
     // Keyboard shortcuts: 1=EE, 2=ME, 3=AE, 4=BE
     useEffect(() => {
@@ -73,73 +125,81 @@ const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) =>
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [competencyLevel]);
-
-    const handleSave = async (saveAndNext = false) => {
-        if (!competencyLevel) {
-            showToast('Please select a competency level', 'error');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            const payload = {
-                competency_level: competencyLevel,
-                competency_comment: comment,
-                status: 'graded'
-            };
-
-            await put(`/api/assignment-submissions/${submission.id}/`, payload);
-
-            if (assignment.learning_outcome) {
-                await post('/api/cbc/competency-assessments/', {
-                    student: submission.student,
-                    learning_outcome: assignment.learning_outcome,
-                    competency_level: competencyLevel,
-                    teacher: assignment.teacher || submission.teacher,
-                    teacher_comment: comment,
-                    evidence: `Assignment: ${assignment.title}`,
-                    assignment_submission: submission.id
-                });
-            }
-
-            showToast('Assessment Recorded');
-            onGraded();
-
-            if (saveAndNext && hasNext) {
-                onNext();
-            }
-        } catch (error) {
-            console.error('Error saving grade:', error);
-            showToast('Failed to record assessment', 'error');
-        } finally {
-            setSubmitting(false);
-        }
-    };
+    }, [competencyLevel, handleSave]);
 
     return (
         <div className="space-y-10">
-            {/* Student Bio Header */}
-            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-[#18216D] text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-900/20">
-                        {submission.student_name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                        <h4 className="text-xl font-black text-[#18216D] tracking-tight">{submission.student_name}</h4>
-                        <div className="flex items-center gap-4 mt-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {submission.student_id || '24/00863'}</p>
-                            <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                <i className="far fa-clock text-[#FFC425]" />
-                                Submitted {new Date(submission.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
+            {/* Student Bio Header & Submission Artifact */}
+            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 space-y-6">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 bg-[#18216D] text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-900/20">
+                            {submission.student_name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h4 className="text-xl font-black text-[#18216D] tracking-tight">{submission.student_name}</h4>
+                            <div className="flex items-center gap-4 mt-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ID: {submission.student_id || '24/00863'}</p>
+                                <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <i className="far fa-clock text-[#FFC425]" />
+                                    Submitted {new Date(submission.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                            </div>
                         </div>
                     </div>
+                    {submission.status?.toLowerCase() === 'graded' && (
+                        <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest font-black">Graded</span>
+                        </div>
+                    )}
                 </div>
-                {submission.status === 'Graded' && (
-                    <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
-                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Status: Graded</span>
+
+                {/* Submission Content Detail */}
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Submission Detail</p>
+                        {submission.file_url && (
+                            <a
+                                href={submission.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 bg-[#18216D] text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-[#0D164F] transition-all"
+                            >
+                                <i className="fas fa-download" />
+                                Download Artifact
+                            </a>
+                        )}
+                    </div>
+
+                    {submission.text_response ? (
+                        <div className="max-h-32 overflow-y-auto custom-scrollbar pr-2">
+                            <p className="text-sm font-medium text-slate-600 leading-relaxed italic">
+                                "{submission.text_response}"
+                            </p>
+                        </div>
+                    ) : !submission.file_url && (
+                        <p className="text-xs text-slate-300 italic">No text content provided.</p>
+                    )}
+                </div>
+
+                {/* Tested Competencies List */}
+                {(assignment.tested_outcomes_detail?.length > 0 || assignment.learning_outcome_description) && (
+                    <div className="pt-4 border-t border-slate-100/50">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Tested Competencies</p>
+                        <div className="flex flex-wrap gap-2">
+                            {assignment.tested_outcomes_detail?.length > 0 ? (
+                                assignment.tested_outcomes_detail.map((o) => (
+                                    <div key={o.id} className="bg-[#18216D]/5 px-3 py-1 rounded-lg border border-[#18216D]/10">
+                                        <p className="text-[10px] font-bold text-[#18216D]">{o.description}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="bg-[#18216D]/5 px-3 py-1 rounded-lg border border-[#18216D]/10">
+                                    <p className="text-[10px] font-bold text-[#18216D]">{assignment.learning_outcome_description}</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

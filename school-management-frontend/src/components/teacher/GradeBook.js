@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
 import { PencilSquareIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { calculateLevel, getLevelData } from '../../utils/cbcUtils';
 
 const GradeBook = ({ courseId }) => {
     const { get, put, post } = useApi();
@@ -131,11 +132,21 @@ const GradeBook = ({ courseId }) => {
                                 Student
                             </th>
                             {gradebook.assignments.map((assignment) => (
-                                <th key={assignment.id} className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                <th key={`asgn-${assignment.id}`} className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] bg-slate-50/50">
                                     <div className="flex flex-col">
                                         <span className="font-bold text-gray-900">{assignment.title}</span>
-                                        <span className="text-xs text-gray-400 mt-1">
-                                            {assignment.total_marks} pts
+                                        <span className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest">
+                                            {assignment.total_marks} Marks
+                                        </span>
+                                    </div>
+                                </th>
+                            ))}
+                            {gradebook.quizzes && gradebook.quizzes.map((quiz) => (
+                                <th key={`quiz-${quiz.id}`} className="px-6 py-3 text-center text-xs font-medium text-[#18216D]/60 uppercase tracking-wider min-w-[120px] bg-amber-50/30">
+                                    <div className="flex flex-col">
+                                        <span className="font-black text-[#18216D]">{quiz.title}</span>
+                                        <span className="text-[10px] text-amber-600/60 mt-1 font-black uppercase tracking-widest">
+                                            Auto-Quiz ({quiz.total_points} pts)
                                         </span>
                                     </div>
                                 </th>
@@ -173,7 +184,7 @@ const GradeBook = ({ courseId }) => {
                                             editingCell?.assignmentId === assignment.id;
 
                                         return (
-                                            <td key={assignment.id} className="px-6 py-4 whitespace-nowrap text-center">
+                                            <td key={`asgn-${assignment.id}`} className="px-6 py-4 whitespace-nowrap text-center border-r border-gray-50">
                                                 {isEditing ? (
                                                     <div className="flex items-center justify-center space-x-2">
                                                         <input
@@ -200,23 +211,46 @@ const GradeBook = ({ courseId }) => {
                                                     </div>
                                                 ) : (
                                                     <div
-                                                        className="group cursor-pointer inline-flex items-center space-x-2 px-3 py-1 rounded hover:bg-gray-100 transition-colors"
+                                                        className="group cursor-pointer inline-flex items-center space-x-2 px-3 py-1 rounded hover:bg-slate-50 transition-colors"
                                                         onClick={() => handleEditClick(student.student_id, assignment.id, gradeData?.score)}
                                                     >
                                                         {gradeData ? (
                                                             <>
-                                                                <span className="text-sm font-semibold text-gray-900">
+                                                                <span className="text-sm font-black text-[#18216D]">
                                                                     {gradeData.score}
                                                                 </span>
-                                                                <span className="text-xs font-bold text-blue-600">
+                                                                <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">
                                                                     {gradeData.letter_grade}
                                                                 </span>
                                                             </>
                                                         ) : (
-                                                            <span className="text-sm text-gray-400">-</span>
+                                                            <span className="text-sm text-slate-300 font-bold">-</span>
                                                         )}
-                                                        <PencilSquareIcon className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        <PencilSquareIcon className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                                     </div>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+
+                                    {gradebook.quizzes && gradebook.quizzes.map((quiz) => {
+                                        const quizGrade = student.quiz_grades ? student.quiz_grades[quiz.id] : null;
+                                        const levelCode = quizGrade ? calculateLevel(quizGrade.score, quizGrade.total) : null;
+                                        const levelData = levelCode ? getLevelData(levelCode) : null;
+
+                                        return (
+                                            <td key={`quiz-${quiz.id}`} className="px-6 py-4 whitespace-nowrap text-center bg-amber-50/5 border-r border-amber-100/20">
+                                                {quizGrade ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <span className={`text-xs font-black px-2 py-0.5 rounded uppercase tracking-widest border ${levelData?.bg} ${levelData?.color}`}>
+                                                            {levelCode}
+                                                        </span>
+                                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mt-1.5 opacity-60">
+                                                            {quizGrade.score} / {quizGrade.total}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[9px] text-slate-300 font-bold uppercase tracking-widest">Unattempted</span>
                                                 )}
                                             </td>
                                         );

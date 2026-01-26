@@ -24,6 +24,8 @@ import BulkGrading from './components/teacher/BulkGrading';
 import ParentDashboard from './pages/parent/ParentDashboard';
 import ChildFinances from './pages/parent/ChildFinances';
 import SubmissionListPage from './pages/teacher/SubmissionListPage';
+import SuccessHub from './components/student/SuccessHub';
+import ParentReport from './pages/parent/ParentReport';
 
 function App() {
     const { isAuthenticated, loading: authLoading, user } = useAuth();
@@ -47,6 +49,7 @@ function App() {
                 dispatch({ type: 'SET_TEACHER_ATTENDANCE', payload: attendanceData || [] });
                 dispatch({ type: 'SET_COURSES', payload: coursesResponse?.courses || [] });
                 dispatch({ type: 'SET_UNIQUE_STUDENT_COUNT', payload: coursesResponse?.unique_student_count || 0 });
+                dispatch({ type: 'SET_PENDING_ACTIONS', payload: coursesResponse?.pending_actions || [] });
             } else if (user.role === 'student') {
                 const [attendanceData, enrolledCourses] = await Promise.all([
                     get(`/students/${user.id}/attendance/`),
@@ -105,6 +108,8 @@ function App() {
                                     <Navigate to="/admin" replace />
                                 ) : user?.role === 'teacher' ? (
                                     <TeacherDashboard />
+                                ) : user?.role === 'parent' ? (
+                                    <Navigate to="/parent" replace />
                                 ) : (
                                     <StudentDashboard />
                                 )
@@ -154,6 +159,16 @@ function App() {
                                 )
                             ) : (
                                 <Navigate to="/login" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/success-hub"
+                        element={
+                            isAuthenticated && user?.role === 'student' ? (
+                                <SuccessHub />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
                             )
                         }
                     />
@@ -236,10 +251,30 @@ function App() {
                         }
                     />
                     <Route
-                        path="/parent/*"
+                        path="/parent"
                         element={
                             isAuthenticated && user?.role === 'parent' ? (
                                 <ParentDashboard />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/parent/child/:childId/progress"
+                        element={
+                            isAuthenticated && user?.role === 'parent' ? (
+                                <ParentReport />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/parent/child/:childId/finances"
+                        element={
+                            isAuthenticated && user?.role === 'parent' ? (
+                                <ChildFinances />
                             ) : (
                                 <Navigate to="/dashboard" replace />
                             )

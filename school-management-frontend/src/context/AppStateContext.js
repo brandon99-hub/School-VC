@@ -12,6 +12,8 @@ const appReducer = (state, action) => {
             return { ...state, studentAttendance: action.payload };
         case 'SET_UNIQUE_STUDENT_COUNT':
             return { ...state, uniqueStudentCount: action.payload };
+        case 'SET_PENDING_ACTIONS':
+            return { ...state, pendingActions: action.payload };
         case 'SET_LOADING':
             return { ...state, loading: action.payload };
         case 'SET_TOAST':
@@ -19,7 +21,7 @@ const appReducer = (state, action) => {
         case 'CLEAR_TOAST':
             return { ...state, toast: null };
         case 'CLEAR_STATE':
-            return { courses: [], teacherAttendance: [], studentAttendance: [], uniqueStudentCount: 0, loading: false, error: null, toast: null };
+            return { courses: [], teacherAttendance: [], studentAttendance: [], uniqueStudentCount: 0, pendingActions: [], loading: false, error: null, toast: null };
         default:
             return state;
     }
@@ -31,6 +33,7 @@ export const AppStateProvider = ({ children }) => {
         teacherAttendance: [],
         studentAttendance: [],
         uniqueStudentCount: 0,
+        pendingActions: [],
         loading: false,
         error: null,
         toast: null,

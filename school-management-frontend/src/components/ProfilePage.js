@@ -136,11 +136,6 @@ const ProfilePage = () => {
             value: profile.role === 'teacher' ? profile.years_experience ?? '--' : profile.grade || '--',
             icon: profile.role === 'teacher' ? 'fas fa-briefcase' : 'fas fa-graduation-cap',
         },
-        {
-            label: 'Attendance',
-            value: `${profile.attendance_rate ?? 0}%`,
-            icon: 'fas fa-check-circle',
-        },
     ];
 
     const teacherProfile = profile.teacher_profile;
@@ -326,14 +321,18 @@ const ProfilePage = () => {
                                     <label className={labelBase} htmlFor="grade">
                                         Grade / Level
                                     </label>
-                                    <input
+                                    <select
                                         id="grade"
                                         name="grade"
-                                        type="text"
                                         value={formData.grade}
                                         onChange={handleChange}
                                         className={inputBase}
-                                    />
+                                    >
+                                        <option value="">Select Grade</option>
+                                        {[...Array(10)].map((_, i) => (
+                                            <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="space-y-2">
                                     <p className={labelBase}>Identifier</p>

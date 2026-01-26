@@ -1,21 +1,7 @@
+// src/components/auth/Signup.js
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
-
-const inputBase =
-    'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition disabled:bg-gray-50 disabled:text-gray-400';
-
-const labelBase = 'text-xs font-semibold uppercase tracking-wide text-gray-500';
-
-const Section = ({ title, description, children }) => (
-    <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <div>
-            <p className="text-sm font-semibold text-gray-900">{title}</p>
-            {description && <p className="text-sm text-gray-500">{description}</p>}
-        </div>
-        {children}
-    </div>
-);
 
 const Signup = () => {
     const [formData, setFormData] = useState({
@@ -74,309 +60,256 @@ const Signup = () => {
             } else {
                 payload.teacher_id = formData.teacherId;
             }
-
-            await post('/api/auth/register/', payload, {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                withCredentials: true,
-            });
+            await post('/api/auth/register/', payload);
             navigate('/login');
         } catch (err) {
-            const errorMsg = err.response?.data?.detail || 'Signup failed. Please try again.';
+            const errorMsg = err.response?.data?.detail || err.response?.data?.error || 'Signup failed. Please try again.';
             setError(errorMsg);
-            console.error('Signup error:', err.response?.data || err);
         } finally {
             setLoading(false);
         }
     };
 
-    const roleFields = useMemo(() => formData.role === 'student', [formData.role]);
-
     return (
-        <div className="min-h-screen bg-slate-50 grid grid-cols-1 lg:grid-cols-2">
-            <section className="hidden lg:flex flex-col justify-between bg-slate-900 p-12 text-white">
-                <div>
-                    <p className="text-sm uppercase tracking-wider text-white/70 font-semibold">Join the platform</p>
-                    <h1 className="text-4xl font-bold mt-4 max-w-md leading-snug">Create an account tailored to your role.</h1>
-                    <p className="mt-4 text-white/80 max-w-lg">
-                        Students get guided learning paths, teachers unlock instruction dashboards, and admins oversee the entire
-                        operation from one pane of glass.
+        <div className="min-h-screen bg-white flex flex-col lg:flex-row">
+            {/* Branding Side */}
+            <div className="lg:w-1/3 bg-[#18216D] p-12 flex flex-col justify-between text-white relative overflow-hidden">
+                <div className="z-10">
+                    <Link to="/login" className="flex items-center gap-3 mb-12 group">
+                        <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <i className="fas fa-arrow-left text-[#18216D] text-sm"></i>
+                        </div>
+                        <span className="text-xl font-black tracking-tight uppercase">Kianda<span className="text-[#FFC425]">OS</span></span>
+                    </Link>
+
+                    <h1 className="text-4xl font-black mb-6 leading-tight">
+                        Create <br />
+                        <span className="text-[#FFC425]">Account</span>
+                    </h1>
+                    <p className="text-blue-100/70 leading-relaxed">
+                        Join the Kianda School portal. Fill in your details to get started.
                     </p>
                 </div>
-                <div className="space-y-6 text-sm text-white/80">
-                    <div>
-                        <p className="font-semibold text-white">Built for impact</p>
-                        <p>Secure onboarding, automated permissions, and workflow automations aligned to the School OS pillars.</p>
-                    </div>
-                    <div>
-                        <p className="font-semibold text-white">Need assistance?</p>
-                        <p>Reach out at onboarding@schoolos.com and we will guide you through provisioning.</p>
-                    </div>
-                </div>
-            </section>
 
-            <main className="flex items-center justify-center py-12 px-6 lg:px-12">
-                <div className="w-full max-w-2xl space-y-8">
-                    <div className="space-y-2 text-center">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Create account</p>
-                        <h2 className="text-3xl font-bold text-gray-900">Tell us who you are</h2>
-                        <p className="text-sm text-gray-500">We’ll personalize your experience and unlock the right tools.</p>
+                <div className="z-10 bg-white/5 backdrop-blur-sm rounded-3xl p-6 border border-white/10">
+                    <p className="text-[#FFC425] font-black uppercase text-[10px] tracking-[0.2em] mb-4">Support</p>
+                    <p className="text-sm text-blue-100/60 leading-relaxed mb-4">
+                        Need help? Contact our support team.
+                    </p>
+                    <p className="text-sm font-bold">helpdesk@kianda.ac.ke</p>
+                </div>
+
+                {/* Decorative */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+            </div>
+
+            {/* Form Side */}
+            <div className="lg:w-2/3 flex items-center justify-center p-8 bg-slate-50 overflow-y-auto">
+                <div className="w-full max-w-3xl bg-white rounded-[2.5rem] shadow-2xl shadow-indigo-900/10 border border-slate-100 p-10 lg:p-12">
+                    <div className="mb-10">
+                        <h2 className="text-3xl font-black text-[#18216D]">Register</h2>
+                        <p className="text-slate-400 font-bold text-sm mt-2 font-mono uppercase tracking-[0.1em]">Step 1: Role Selection</p>
                     </div>
+
                     {error && (
-                        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div className="mb-8 p-4 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl text-sm font-bold flex items-center gap-3">
+                            <i className="fas fa-circle-exclamation"></i>
                             {error}
                         </div>
                     )}
-                    <form className="space-y-6" onSubmit={handleSubmit}>
-                        <Section
-                            title="Select your role"
-                            description="Role determines default permissions. You can always request changes later."
-                        >
-                            <div className="flex flex-wrap gap-3">
-                                {['student', 'teacher'].map((role) => (
-                                    <button
-                                        key={role}
-                                        type="button"
-                                        onClick={() => setFormData((prev) => ({ ...prev, role }))}
-                                        className={`flex-1 min-w-[140px] rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
-                                            formData.role === role
-                                                ? 'border-indigo-500 bg-indigo-50 text-indigo-600 shadow-sm'
-                                                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                                        }`}
-                                        disabled={loading}
-                                    >
-                                        <span className="capitalize">{role}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </Section>
 
-                        <Section title="Personal details" description="We’ll use this to complete your profile.">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <label htmlFor="firstName" className={labelBase}>
-                                        First name
-                                    </label>
+                    <form className="space-y-8" onSubmit={handleSubmit}>
+                        {/* Role Picker */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {['student', 'teacher'].map((role) => (
+                                <button
+                                    key={role}
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, role }))}
+                                    className={`py-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${formData.role === role
+                                        ? 'border-[#18216D] bg-indigo-50/50 text-[#18216D]'
+                                        : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200'
+                                        }`}
+                                >
+                                    <i className={`fas ${role === 'student' ? 'fa-user-graduate' : 'fa-chalkboard-user'
+                                        } text-lg`}></i>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{role}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-50">
+                            <p className="text-slate-400 font-bold text-sm mb-6 font-mono uppercase tracking-[0.1em]">Step 2: Personal Info</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">First Name</label>
                                     <input
-                                        id="firstName"
-                                        name="firstName"
                                         type="text"
+                                        name="firstName"
                                         required
-                                        disabled={loading}
                                         value={formData.firstName}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="Jane"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                        placeholder="First Name"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="lastName" className={labelBase}>
-                                        Last name
-                                    </label>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Last Name</label>
                                     <input
-                                        id="lastName"
-                                        name="lastName"
                                         type="text"
+                                        name="lastName"
                                         required
-                                        disabled={loading}
                                         value={formData.lastName}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="Doe"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                        placeholder="Last Name"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="email" className={labelBase}>
-                                        Email
-                                    </label>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Email Address</label>
                                     <input
-                                        id="email"
-                                        name="email"
                                         type="email"
+                                        name="email"
                                         required
-                                        disabled={loading}
                                         value={formData.email}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="you@yourschool.com"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                        placeholder="Email"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="phone" className={labelBase}>
-                                        Phone
-                                    </label>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Phone Number</label>
                                     <input
-                                        id="phone"
-                                        name="phone"
                                         type="tel"
-                                        required={roleFields}
-                                        disabled={loading}
+                                        name="phone"
+                                        required
                                         value={formData.phone}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="+254 700 000 000"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                        placeholder="Phone"
                                     />
                                 </div>
                             </div>
-                        </Section>
+                        </div>
 
-                        <Section title="Role details" description="Provide the identifiers your school issued to you.">
-                            {formData.role === 'student' ? (
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <label htmlFor="studentId" className={labelBase}>
-                                            Student ID
-                                        </label>
+                        <div className="pt-4 border-t border-slate-50">
+                            <p className="text-slate-400 font-bold text-sm mb-6 font-mono uppercase tracking-[0.1em]">Step 3: School Info</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {formData.role === 'student' && (
+                                    <>
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Student ID</label>
+                                            <input
+                                                type="text"
+                                                name="studentId"
+                                                required
+                                                value={formData.studentId}
+                                                onChange={handleChange}
+                                                className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                                placeholder="Student ID"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Grade</label>
+                                            <select
+                                                name="grade"
+                                                required
+                                                value={formData.grade}
+                                                onChange={handleChange}
+                                                className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-bold text-[#18216D] appearance-none cursor-pointer"
+                                            >
+                                                <option value="">Select Grade</option>
+                                                {[...Array(10)].map((_, i) => (
+                                                    <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+
+                                {formData.role === 'teacher' && (
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Teacher ID</label>
                                         <input
-                                            id="studentId"
-                                            name="studentId"
                                             type="text"
+                                            name="teacherId"
                                             required
-                                            disabled={loading}
-                                            value={formData.studentId}
+                                            value={formData.teacherId}
                                             onChange={handleChange}
-                                            className={inputBase}
-                                            placeholder="STU-2025-01"
+                                            className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                            placeholder="Teacher ID"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="grade" className={labelBase}>
-                                            Grade
-                                        </label>
-                                        <input
-                                            id="grade"
-                                            name="grade"
-                                            type="text"
-                                            required
-                                            disabled={loading}
-                                            value={formData.grade}
-                                            onChange={handleChange}
-                                            className={inputBase}
-                                            placeholder="Form 3"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="dateOfBirth" className={labelBase}>
-                                            Date of birth
-                                        </label>
-                                        <input
-                                            id="dateOfBirth"
-                                            name="dateOfBirth"
-                                            type="date"
-                                            required
-                                            disabled={loading}
-                                            value={formData.dateOfBirth}
-                                            onChange={handleChange}
-                                            className={inputBase}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="gender" className={labelBase}>
-                                            Gender
-                                        </label>
-                                        <select
-                                            id="gender"
-                                            name="gender"
-                                            required
-                                            disabled={loading}
-                                            value={formData.gender}
-                                            onChange={handleChange}
-                                            className={inputBase}
-                                        >
-                                            <option value="">Select</option>
-                                            <option value="M">Male</option>
-                                            <option value="F">Female</option>
-                                            <option value="O">Other</option>
-                                        </select>
-                                    </div>
-                                    <div className="md:col-span-2 space-y-2">
-                                        <label htmlFor="address" className={labelBase}>
-                                            Address
-                                        </label>
-                                        <textarea
-                                            id="address"
-                                            name="address"
-                                            rows={3}
-                                            required
-                                            disabled={loading}
-                                            value={formData.address}
-                                            onChange={handleChange}
-                                            className={`${inputBase} resize-none`}
-                                            placeholder="School residence or home address"
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <label htmlFor="teacherId" className={labelBase}>
-                                        Teacher ID
-                                    </label>
-                                    <input
-                                        id="teacherId"
-                                        name="teacherId"
-                                        type="text"
+                                )}
+
+                                <div className="md:col-span-2">
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Address</label>
+                                    <textarea
+                                        name="address"
+                                        rows={2}
                                         required
-                                        disabled={loading}
-                                        value={formData.teacherId}
+                                        value={formData.address}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="TCH-2025-04"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D] resize-none"
+                                        placeholder="Physical Address"
                                     />
                                 </div>
-                            )}
-                        </Section>
+                            </div>
+                        </div>
 
-                        <Section title="Security" description="Choose a strong password to protect your account.">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <label htmlFor="password" className={labelBase}>
-                                        Password
-                                    </label>
+                        <div className="pt-4 border-t border-slate-50">
+                            <p className="text-slate-400 font-bold text-sm mb-6 font-mono uppercase tracking-[0.1em]">Step 4: Password</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Password</label>
                                     <input
-                                        id="password"
-                                        name="password"
                                         type="password"
+                                        name="password"
                                         required
-                                        disabled={loading}
                                         value={formData.password}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="At least 8 characters"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                        placeholder="••••••••"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="confirmPassword" className={labelBase}>
-                                        Confirm password
-                                    </label>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2 ml-1">Confirm Password</label>
                                     <input
-                                        id="confirmPassword"
-                                        name="confirmPassword"
                                         type="password"
+                                        name="confirmPassword"
                                         required
-                                        disabled={loading}
                                         value={formData.confirmPassword}
                                         onChange={handleChange}
-                                        className={inputBase}
-                                        placeholder="Repeat password"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-medium text-[#18216D]"
+                                        placeholder="••••••••"
                                     />
                                 </div>
                             </div>
-                        </Section>
+                        </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                                loading ? 'cursor-not-allowed opacity-70' : ''
-                            }`}
+                            className={`w-full py-5 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:bg-[#0D164F] hover:-translate-y-1 transition-all flex items-center justify-center gap-3 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
-                            {loading ? 'Creating account...' : 'Create account'}
+                            {loading ? (
+                                <>
+                                    <i className="fas fa-circle-notch fa-spin"></i>
+                                    Registering...
+                                </>
+                            ) : (
+                                <>
+                                    <span>Register</span>
+                                    <i className="fas fa-check-circle"></i>
+                                </>
+                            )}
                         </button>
                     </form>
-
                 </div>
-            </main>
+            </div>
         </div>
     );
 };

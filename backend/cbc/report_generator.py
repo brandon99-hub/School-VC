@@ -25,18 +25,76 @@ class CBCReportGenerator:
         # Get all assessments for the student
         assessments = CompetencyAssessment.objects.filter(student=self.student)
         
+        # Get Quiz Submissions that are auto-graded or graded
+        from courses.models import QuizSubmission
+        from django.db.models import Max
+        
+        # Get all attempts
+        all_quiz_subs = QuizSubmission.objects.filter(student=self.student, status__in=['auto_graded', 'graded'])
+        
+        # Get only the highest score per quiz
+        best_attempts_ids = []
+        quiz_ids = all_quiz_subs.values_list('quiz_id', flat=True).distinct()
+        for q_id in quiz_ids:
+            best = all_quiz_subs.filter(quiz_id=q_id).order_by('-score', '-submitted_at').first()
+            if best:
+                best_attempts_ids.append(best.id)
+                
+        quiz_submissions = all_quiz_subs.filter(id__in=best_attempts_ids)
+        
         if self.learning_area_id:
             assessments = assessments.filter(
                 learning_outcome__sub_strand__strand__learning_area_id=self.learning_area_id
             )
+            quiz_submissions = quiz_submissions.filter(
+                quiz__learning_outcome__sub_strand__strand__learning_area_id=self.learning_area_id
+            )
         
-        # Calculate overall statistics
-        total_assessments = assessments.count()
-        competency_breakdown = assessments.values('competency_level').annotate(
-            count=Count('id')
-        )
+        # Helper to map percentage to competency level
+        def map_percentage(score, total):
+            if not total: return None
+            p = (float(score) / float(total)) * 100
+            if p >= 80: return 'EE'
+            if p >= 60: return 'ME'
+            if p >= 40: return 'AE'
+            return 'BE'
+
+        # 1. Map outcomes to their latest achievement level (Outcome-Centric Logic)
+        outcome_achievements = {}
         
-        breakdown_dict = {item['competency_level']: item['count'] for item in competency_breakdown}
+        # Process Direct Assessments
+        for asmt in assessments.select_related('learning_outcome'):
+            outcome_id = asmt.learning_outcome_id
+            if not outcome_id: continue
+            
+            if outcome_id not in outcome_achievements or asmt.assessment_date >= outcome_achievements[outcome_id]['date']:
+                outcome_achievements[outcome_id] = {
+                    'level': asmt.competency_level,
+                    'date': asmt.assessment_date
+                }
+        
+        # Process Quiz Submissions
+        for qs in quiz_submissions.select_related('quiz'):
+            # Fetch outcomes linked to this quiz
+            outcome_ids = list(qs.quiz.tested_outcomes.values_list('id', flat=True))
+            if qs.quiz.learning_outcome_id:
+                outcome_ids.append(qs.quiz.learning_outcome_id)
+                
+            lvl = map_percentage(qs.score, qs.quiz.total_points)
+            if lvl:
+                for o_id in set(outcome_ids):
+                    if o_id not in outcome_achievements or qs.submitted_at.date() >= outcome_achievements[o_id]['date']:
+                        outcome_achievements[o_id] = {
+                            'level': lvl,
+                            'date': qs.submitted_at.date()
+                        }
+
+        # Derive counts from unique achieved outcomes
+        final_levels = [v['level'] for v in outcome_achievements.values()]
+        total_assessments = len(final_levels)
+        breakdown_dict = {}
+        for lvl in final_levels:
+            breakdown_dict[lvl] = breakdown_dict.get(lvl, 0) + 1
         
         # Get learning areas
         if self.learning_area_id:
@@ -52,31 +110,90 @@ class CBCReportGenerator:
             area_assessments = assessments.filter(
                 learning_outcome__sub_strand__strand__learning_area=area
             )
-            
-            area_breakdown = area_assessments.values('competency_level').annotate(
-                count=Count('id')
+            area_quiz_subs = quiz_submissions.filter(
+                quiz__learning_outcome__sub_strand__strand__learning_area=area
             )
+            
+            # Outcome-centric area breakdown
+            area_outcome_achievements = {}
+            for asmt in area_assessments:
+                o_id = asmt.learning_outcome_id
+                if not o_id: continue
+                if o_id not in area_outcome_achievements or asmt.assessment_date >= area_outcome_achievements[o_id]['date']:
+                    area_outcome_achievements[o_id] = {'level': asmt.competency_level, 'date': asmt.assessment_date}
+            
+            for qs in area_quiz_subs:
+                outcome_ids = list(qs.quiz.tested_outcomes.values_list('id', flat=True))
+                if qs.quiz.learning_outcome_id: outcome_ids.append(qs.quiz.learning_outcome_id)
+                lvl = map_percentage(qs.score, qs.quiz.total_points)
+                if lvl:
+                    for o_id in set(outcome_ids):
+                        if o_id not in area_outcome_achievements or qs.submitted_at.date() >= area_outcome_achievements[o_id]['date']:
+                            area_outcome_achievements[o_id] = {'level': lvl, 'date': qs.submitted_at.date()}
+            
+            area_final_levels = [v['level'] for v in area_outcome_achievements.values()]
+            area_breakdown = {}
+            for lvl in area_final_levels:
+                area_breakdown[lvl] = area_breakdown.get(lvl, 0) + 1
             
             strands_data = []
             for strand in area.strands.all():
+                # strand processing...
                 strand_assessments = area_assessments.filter(
                     learning_outcome__sub_strand__strand=strand
+                )
+                strand_quiz_subs = area_quiz_subs.filter(
+                    quiz__learning_outcome__sub_strand__strand=strand
                 )
                 
                 sub_strands_data = []
                 for sub_strand in strand.sub_strands.all():
                     outcomes_data = []
                     for outcome in sub_strand.learning_outcomes.all():
-                        assessment = strand_assessments.filter(
+                        # Find latest assessment for this outcome (either direct or quiz)
+                        latest_asmt = strand_assessments.filter(
                             learning_outcome=outcome
                         ).order_by('-assessment_date').first()
+                        
+                        # Check tested_outcomes M2M relation for quizzes
+                        latest_quiz = strand_quiz_subs.filter(
+                            Q(quiz__learning_outcome=outcome) | 
+                            Q(quiz__tested_outcomes=outcome)
+                        ).order_by('-submitted_at').first()
+                        
+                        # Also check assignments (linked via competency assessments or direct)
+                        # The report generator currently only looks at quiz_submissions directly.
+                        # Direct assessments are already in strand_assessments.
+                        
+                        comp_lvl = None
+                        asmt_date = None
+                        comment = None
+                        
+                        # Compare dates to find the absolute latest
+                        if latest_asmt and latest_quiz:
+                            if latest_asmt.assessment_date >= latest_quiz.submitted_at.date():
+                                comp_lvl = latest_asmt.competency_level
+                                asmt_date = latest_asmt.assessment_date
+                                comment = latest_asmt.teacher_comment
+                            else:
+                                comp_lvl = map_percentage(latest_quiz.score, latest_quiz.quiz.total_points)
+                                asmt_date = latest_quiz.submitted_at.date()
+                                comment = latest_quiz.feedback
+                        elif latest_asmt:
+                            comp_lvl = latest_asmt.competency_level
+                            asmt_date = latest_asmt.assessment_date
+                            comment = latest_asmt.teacher_comment
+                        elif latest_quiz:
+                            comp_lvl = map_percentage(latest_quiz.score, latest_quiz.quiz.total_points)
+                            asmt_date = latest_quiz.submitted_at.date()
+                            comment = latest_quiz.feedback
                         
                         outcomes_data.append({
                             'outcome': outcome.description,
                             'code': outcome.code,
-                            'competency_level': assessment.competency_level if assessment else None,
-                            'assessment_date': assessment.assessment_date if assessment else None,
-                            'teacher_comment': assessment.teacher_comment if assessment else None
+                            'competency_level': comp_lvl,
+                            'assessment_date': asmt_date,
+                            'teacher_comment': comment
                         })
                     
                     sub_strands_data.append({
@@ -93,8 +210,8 @@ class CBCReportGenerator:
                 'name': area.name,
                 'code': area.code,
                 'strands': strands_data,
-                'total_assessments': area_assessments.count(),
-                'breakdown': {item['competency_level']: item['count'] for item in area_breakdown}
+                'total_assessments': len(area_lvls),
+                'breakdown': area_breakdown
             })
         
         return {

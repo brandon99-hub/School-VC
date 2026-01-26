@@ -8,7 +8,7 @@ from rest_framework.decorators import permission_classes, api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .models import Teacher, TeacherAttendance
-from courses.models import Course, Assignment, Schedule
+from courses.models import Course, Assignment, Schedule, Quiz, QuizSubmission, AssignmentSubmission
 from students.models import Student, Attendance
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
@@ -302,10 +302,51 @@ def assigned_courses_api(request):
     unique_students = Student.objects.filter(
         learning_areas__teacher=request.user.teacher
     ).distinct().count()
+
+    # Get Pending Actions (Recent activity)
+    pending_actions = []
+    
+    # 1. Un-graded Assignment Submissions
+    ungraded_submissions = AssignmentSubmission.objects.filter(
+        assignment__learning_area__teacher=request.user.teacher,
+        status__iexact='submitted'
+    ).order_by('-submitted_at')[:5]
+    
+    for sub in ungraded_submissions:
+        pending_actions.append({
+            'id': f"sub_{sub.id}",
+            'type': 'assignment',
+            'title': sub.assignment.title,
+            'student_name': sub.student.get_full_name(),
+            'submitted_at': sub.submitted_at,
+            'assignment_id': sub.assignment.id,
+            'learning_area_id': sub.assignment.learning_area_id
+        })
+        
+    # 2. Recent Quiz Results (Auto-graded)
+    recent_quizzes = QuizSubmission.objects.filter(
+        quiz__learning_area__teacher=request.user.teacher,
+        status__in=['auto_graded', 'graded']
+    ).order_by('-submitted_at')[:5]
+    
+    for q in recent_quizzes:
+        pending_actions.append({
+            'id': f"quiz_{q.id}",
+            'type': 'quiz_result',
+            'title': q.quiz.title,
+            'student_name': q.student.get_full_name(),
+            'score': float(q.score or 0),
+            'total': float(q.quiz.total_points or 100), # Use total_points property from Quiz model
+            'submitted_at': q.submitted_at
+        })
+
+    # Sort all by most recent
+    pending_actions.sort(key=lambda x: x['submitted_at'], reverse=True)
     
     return Response({
         'courses': serializer.data,
-        'unique_student_count': unique_students
+        'unique_student_count': unique_students,
+        'pending_actions': pending_actions[:5]
     })
 
 @api_view(['GET'])

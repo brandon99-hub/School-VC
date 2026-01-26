@@ -70,7 +70,7 @@ const QuizTaker = ({ quiz, onClose, onComplete }) => {
 
             const responses = Object.entries(answers).map(([questionId, answer]) => ({
                 question: parseInt(questionId),
-                selected_answer: answer
+                response: answer
             }));
 
             const submission = await post('/courses/quiz-submissions/', {
@@ -113,7 +113,8 @@ const QuizTaker = ({ quiz, onClose, onComplete }) => {
     }
 
     if (result) {
-        const percentage = Math.round(((result.score || 0) / questions.length) * 100);
+        const totalPoints = quiz.total_points || questions.length;
+        const percentage = Math.round(((result.score || 0) / totalPoints) * 100);
         return (
             <div className="fixed inset-0 bg-[#18216D]/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-[3rem] shadow-2xl max-w-2xl w-full p-10 overflow-hidden border border-white/20 animate-in zoom-in-95 duration-500">
@@ -128,7 +129,7 @@ const QuizTaker = ({ quiz, onClose, onComplete }) => {
                             <div className="text-center">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Final Score</p>
                                 <p className="text-3xl font-black text-[#18216D]">
-                                    {result.score || 0} <span className="text-slate-300">/</span> {questions.length}
+                                    {result.score || 0} <span className="text-slate-300">/</span> {quiz.total_points || questions.length}
                                 </p>
                             </div>
                             <div className="w-[1px] bg-slate-200" />

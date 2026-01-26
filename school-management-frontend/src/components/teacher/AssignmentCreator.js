@@ -13,7 +13,20 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
     const [learningArea, setLearningArea] = useState(null);
     const [strands, setStrands] = useState([]);
     const [selectedStrand, setSelectedStrand] = useState(assignment?.strand_id || null);
-    const [selectedOutcome, setSelectedOutcome] = useState(assignment?.learning_outcome ? { id: assignment.learning_outcome, description: assignment.learning_outcome_description } : null);
+    const [selectedOutcomes, setSelectedOutcomes] = useState(
+        assignment?.tested_outcomes_detail?.length > 0
+            ? assignment.tested_outcomes_detail.map(o => ({
+                id: o.id,
+                description: o.description,
+                code: o.code,
+                sub_strand_id: o.sub_strand_id
+            }))
+            : (assignment?.learning_outcome ? [{
+                id: parseInt(assignment.learning_outcome),
+                description: assignment.learning_outcome_description,
+                sub_strand_id: parseInt(assignment.sub_strand_id)
+            }] : [])
+    );
 
     const [formData, setFormData] = useState({
         title: assignment?.title || '',
@@ -45,7 +58,7 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
             }
         };
         fetchInitialData();
-    }, [courseId, get]);
+    }, [courseId, get, showToast]);
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -72,7 +85,7 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
         if (!formData.title.trim()) newErrors.title = 'Assignment title is required';
         if (!formData.description.trim()) newErrors.description = 'Description is required';
         if (!formData.due_date) newErrors.due_date = 'Due date is required';
-        if (!selectedOutcome) newErrors.learning_outcome = 'Learning Outcome is required';
+        if (selectedOutcomes.length === 0) newErrors.learning_outcome = 'At least one Learning Outcome is required';
 
         if (formData.submission_types.length === 0) {
             newErrors.submission_types = 'Select at least one submission type';
@@ -98,7 +111,8 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
                 status: 'Pending',
                 is_cbc_assignment: true,
                 learning_area: courseId,
-                learning_outcome: selectedOutcome.id,
+                learning_outcome: selectedOutcomes[0]?.id, // Fallback for legacy
+                tested_outcomes: selectedOutcomes.map(o => o.id),
                 assessment_type: formData.assessment_type,
             };
 
@@ -169,7 +183,7 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
                                     value={selectedStrand || ''}
                                     onChange={(e) => {
                                         setSelectedStrand(e.target.value);
-                                        setSelectedOutcome(null);
+                                        setSelectedOutcomes([]);
                                     }}
                                     className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-bold text-gray-900 outline-none"
                                 >
@@ -181,12 +195,15 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
                             </div>
 
                             {selectedStrand && (
-                                <LearningOutcomeSelector
-                                    learningAreaId={courseId}
-                                    strandId={selectedStrand}
-                                    selectedOutcome={selectedOutcome}
-                                    onChange={setSelectedOutcome}
-                                />
+                                <div className="md:col-span-2">
+                                    <LearningOutcomeSelector
+                                        learningAreaId={courseId}
+                                        strandId={selectedStrand}
+                                        selectedOutcomes={selectedOutcomes}
+                                        multiple={true}
+                                        onChange={setSelectedOutcomes}
+                                    />
+                                </div>
                             )}
                         </div>
                         {errors.learning_outcome && <p className="text-red-500 text-xs font-bold mt-2 ml-1">{errors.learning_outcome}</p>}

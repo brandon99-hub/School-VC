@@ -9,6 +9,8 @@ import FeeManagement from './FeeManagement';
 import PaymentRecording from './PaymentRecording';
 import CurriculumRegistry from './CurriculumRegistry';
 import { useApi } from '../../hooks/useApi';
+import ParentRegistrationModal from '../../components/admin/ParentRegistrationModal';
+import UserRegistrationModal from '../../components/admin/UserRegistrationModal';
 
 const StatCard = ({ title, value, icon, color, link }) => (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 hover:shadow-lg transition-all group">
@@ -39,6 +41,8 @@ const Dashboard = () => {
         totalStudents: 0,
     });
     const [loading, setLoading] = useState(true);
+    const [showParentModal, setShowParentModal] = useState(false);
+    const [showUserModal, setShowUserModal] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -116,21 +120,22 @@ const Dashboard = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Link
-                        to="/admin/curriculum"
-                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group shadow-sm bg-slate-50/50"
+                    <button
+                        onClick={() => setShowParentModal(true)}
+                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all group shadow-sm bg-slate-50/50 text-left"
                     >
-                        <span className="h-12 w-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
-                            <i className="fas fa-sitemap"></i>
+                        <span className="h-12 w-12 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
+                            <i className="fas fa-user-group"></i>
                         </span>
                         <div>
-                            <p className="font-bold text-gray-900 group-hover:text-blue-700">Open Registry</p>
-                            <p className="text-xs text-gray-500">Manage KICD subjects</p>
+                            <p className="font-bold text-gray-900 group-hover:text-amber-700">Link Parent</p>
+                            <p className="text-xs text-gray-500">Register and link parents</p>
                         </div>
-                    </Link>
-                    <Link
-                        to="/admin/users"
-                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group shadow-sm bg-slate-50/50"
+                    </button>
+
+                    <button
+                        onClick={() => setShowUserModal(true)}
+                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group shadow-sm bg-slate-50/50 text-left"
                     >
                         <span className="h-12 w-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
                             <i className="fas fa-user-gear"></i>
@@ -139,21 +144,19 @@ const Dashboard = () => {
                             <p className="font-bold text-gray-900 group-hover:text-purple-700">Manage Users</p>
                             <p className="text-xs text-gray-500">Add or edit users</p>
                         </div>
-                    </Link>
-                    <Link
-                        to="/admin/courses"
-                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group shadow-sm bg-slate-50/50"
-                    >
-                        <span className="h-12 w-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
-                            <i className="fas fa-list-check"></i>
-                        </span>
-                        <div>
-                            <p className="font-bold text-gray-900 group-hover:text-green-700">Learning Areas</p>
-                            <p className="text-xs text-gray-500">Browse all subjects</p>
-                        </div>
-                    </Link>
+                    </button>
                 </div>
             </div>
+
+            {/* Parent Modal */}
+            {showParentModal && (
+                <ParentRegistrationModal onClose={() => setShowParentModal(false)} />
+            )}
+
+            {/* User Modal */}
+            {showUserModal && (
+                <UserRegistrationModal onClose={() => setShowUserModal(false)} />
+            )}
 
             {/* Finance Overview */}
             <FinanceOverview />

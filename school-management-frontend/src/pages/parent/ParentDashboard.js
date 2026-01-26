@@ -1,86 +1,149 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useApi } from '../../hooks/useApi';
+
+import {
+    ClockIcon,
+    CalendarIcon,
+    AcademicCapIcon,
+    BanknotesIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ChartBarIcon
+} from '@heroicons/react/24/outline';
+import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 
 const ParentDashboard = () => {
     const navigate = useNavigate();
+    const { get } = useApi();
     const [parent, setParent] = useState(null);
     const [selectedChild, setSelectedChild] = useState(null);
-    const [childProgress, setChildProgress] = useState(null);
+    const [childActivities, setChildActivities] = useState(null);
+    const [childFinances, setChildFinances] = useState(null);
+    const [childCalendarData, setChildCalendarData] = useState(null);
+    const [childMetrics, setChildMetrics] = useState(null);
+    const [currentDate, setCurrentDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchParentData();
-    }, []);
-
-    useEffect(() => {
-        if (selectedChild) {
-            fetchChildProgress();
-        }
-    }, [selectedChild]);
-
-    const fetchParentData = async () => {
+    const fetchParentData = useCallback(async () => {
         try {
-            const token = localStorage.getItem('parentAccessToken');
-            const response = await axios.get('/api/parents/me/', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setParent(response.data);
-            if (response.data.children && response.data.children.length > 0) {
-                setSelectedChild(response.data.children[0]);
+            const data = await get('/api/parents/me/');
+            setParent(data);
+            if (data.children && data.children.length > 0) {
+                setSelectedChild(data.children[0]);
             }
         } catch (error) {
             console.error('Error fetching parent data:', error);
-            if (error.response?.status === 401) {
-                navigate('/parent/login');
-            }
         } finally {
             setLoading(false);
         }
-    };
+    }, [get]);
 
-    const fetchChildProgress = async () => {
+    const fetchChildData = useCallback(async () => {
         try {
-            const token = localStorage.getItem('parentAccessToken');
-            const response = await axios.get(`/api/cbc/competency-assessments/summary/${selectedChild.id}/`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setChildProgress(response.data);
+            const [activities, finances, calendar, metrics] = await Promise.all([
+                get(`/api/parents/child-activities/${selectedChild.id}/`),
+                get(`/api/parents/child-finances/${selectedChild.id}/`),
+                get(`/api/parents/child-calendar/${selectedChild.id}/`),
+                get(`/api/cbc/competency-assessments/summary/${selectedChild.id}/`)
+            ]);
+            setChildActivities(activities);
+            setChildFinances(finances);
+            setChildCalendarData(calendar);
+            setChildMetrics(metrics);
         } catch (error) {
-            console.error('Error fetching child progress:', error);
+            console.error('Error fetching child data:', error);
         }
+    }, [get, selectedChild?.id]);
+
+    useEffect(() => {
+        fetchParentData();
+    }, [fetchParentData]);
+
+    useEffect(() => {
+        if (selectedChild) {
+            fetchChildData();
+        }
+    }, [selectedChild, fetchChildData]);
+
+    const daysInMonth = useMemo(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const days = new Date(year, month + 1, 0).getDate();
+
+        const calendarDays = [];
+        for (let i = 0; i < firstDay; i++) {
+            calendarDays.push({ day: null, fullDate: null });
+        }
+        for (let i = 1; i <= days; i++) {
+            calendarDays.push({
+                day: i,
+                fullDate: new Date(year, month, i).toISOString().split('T')[0]
+            });
+        }
+        return calendarDays;
+    }, [currentDate]);
+
+    const eventDates = useMemo(() => {
+        const dates = {};
+        if (!childCalendarData) return dates;
+
+        const allEvents = [
+            ...(childCalendarData.assignments || []).map(a => ({ ...a, type: 'Assignment' })),
+            ...(childCalendarData.quizzes || []).map(q => ({ ...q, type: 'Quiz' }))
+        ];
+
+        allEvents.forEach(ev => {
+            if (ev.due_date) {
+                const date = new Date(ev.due_date).toISOString().split('T')[0];
+                if (!dates[date]) dates[date] = [];
+                dates[date].push(ev);
+            }
+        });
+        return dates;
+    }, [childCalendarData]);
+
+    const changeMonth = (offset) => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1));
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('parentAccessToken');
-        localStorage.removeItem('parentRefreshToken');
-        localStorage.removeItem('parentData');
-        navigate('/parent/login');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        navigate('/login');
     };
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#18216D]"></div>
             </div>
         );
     }
 
     if (!parent || !parent.children || parent.children.length === 0) {
         return (
-            <div className="min-h-screen bg-gray-50 p-6">
-                <div className="max-w-4xl mx-auto">
-                    <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">No Children Linked</h2>
-                        <p className="text-gray-600 mb-6">
-                            You haven't linked any children to your account yet.
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
+                <div className="max-w-2xl w-full">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-indigo-900/10 p-12 text-center border border-slate-100 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16"></div>
+                        <div className="h-24 w-24 bg-indigo-50 rounded-3xl flex items-center justify-center mx-auto mb-8 relative z-10">
+                            <i className="fas fa-users-viewfinder text-4xl text-[#18216D]"></i>
+                        </div>
+                        <h2 className="text-3xl font-black text-[#18216D] mb-4">Awaiting Connection</h2>
+                        <p className="text-slate-500 font-medium text-lg leading-relaxed mb-10">
+                            Welcome to the Kianda Parent Portal. Your account is active, but no scholar profiles have been linked to your profile yet by the administration.
                         </p>
-                        <button
-                            onClick={() => navigate('/parent/add-child')}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                            Add Child
-                        </button>
+                        <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100 flex items-start gap-4 text-left">
+                            <i className="fas fa-circle-info text-amber-600 mt-1"></i>
+                            <div>
+                                <p className="text-sm font-black text-amber-900 uppercase tracking-wider mb-1">What's Next?</p>
+                                <p className="text-sm text-amber-800/80 font-medium">
+                                    Please contact the school administration office to have your children's profiles securely connected to your account.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -88,146 +151,315 @@ const ParentDashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header */}
-            <div className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Parent Dashboard</h1>
-                            <p className="text-sm text-gray-600 mt-1">Welcome, {parent.first_name}</p>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            Logout
-                        </button>
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+
+            <main className="max-w-7xl mx-auto w-full px-6 py-10 flex-1">
+                <div className="mb-12 flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="text-center sm:text-left">
+                        <h1 className="text-4xl font-black text-[#18216D] tracking-tight">Parent Dashboard</h1>
+                        <p className="text-slate-500 mt-2 font-medium tracking-tight">Monitor scholar progress and manage school administration details</p>
                     </div>
-                </div>
-            </div>
-
-            <div className="max-w-7xl mx-auto px-6 py-8">
-                {/* Child Selector */}
-                <div className="mb-8">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Child
-                    </label>
-                    <select
-                        value={selectedChild?.id || ''}
-                        onChange={(e) => {
-                            const child = parent.children.find(c => c.id === parseInt(e.target.value));
-                            setSelectedChild(child);
-                        }}
-                        className="w-full md:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    <button
+                        onClick={handleLogout}
+                        className="px-6 py-3 bg-white text-slate-400 hover:text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-100 shadow-sm flex items-center gap-2"
                     >
-                        {parent.children.map(child => (
-                            <option key={child.id} value={child.id}>
-                                {child.first_name} {child.last_name} - Grade {child.grade}
-                            </option>
-                        ))}
-                    </select>
+                        <i className="fas fa-sign-out-alt"></i>
+                        Secure Logout
+                    </button>
                 </div>
 
-                {/* Child Overview Cards */}
+                <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Active Scholar Repository</label>
+                        <div className="flex flex-wrap gap-2">
+                            {parent.children.map(child => (
+                                <button
+                                    key={child.id}
+                                    onClick={() => setSelectedChild(child)}
+                                    className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border-2 ${selectedChild?.id === child.id
+                                        ? 'bg-[#18216D] text-white border-[#18216D] shadow-xl shadow-indigo-900/20 scale-105'
+                                        : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}
+                                >
+                                    {child.first_name} {child.last_name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {selectedChild && (
+                        <div className="bg-[#FFC425]/10 border border-[#FFC425]/20 px-6 py-3 rounded-2xl">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-[#B48A1B]">Official Designation</p>
+                            <p className="text-xs font-bold text-[#18216D]">Grade {selectedChild.grade} Scholar • {selectedChild.student_id}</p>
+                        </div>
+                    )}
+                </div>
+
                 {selectedChild && (
-                    <>
-                        {/* Student Info Card */}
-                        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Student Information</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                    <p className="text-sm text-gray-600">Name</p>
-                                    <p className="font-medium">{selectedChild.first_name} {selectedChild.last_name}</p>
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Competency Summary Top Row */}
+                        <div className="mb-8 bg-white rounded-[2.5rem] shadow-2xl shadow-indigo-900/5 border border-slate-100 p-8 sm:p-10">
+                            <h3 className="text-xl font-black text-[#18216D] mb-8 flex items-center gap-3 italic">
+                                <ChartBarIcon className="h-6 w-6 text-[#FFC425]" />
+                                Competency Matrix Summary
+                            </h3>
+                            {childMetrics ? (
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                    {[
+                                        { label: 'Exceeding Expectation', val: childMetrics.by_level?.EE || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: 'fa-crown' },
+                                        { label: 'Meeting Expectation', val: childMetrics.by_level?.ME || 0, color: 'text-blue-600', bg: 'bg-blue-50', icon: 'fa-check-double' },
+                                        { label: 'Approaching Expectation', val: childMetrics.by_level?.AE || 0, color: 'text-amber-600', bg: 'bg-amber-50', icon: 'fa-shoe-prints' },
+                                        { label: 'Below Expectation', val: childMetrics.by_level?.BE || 0, color: 'text-rose-600', bg: 'bg-rose-50', icon: 'fa-triangle-exclamation' },
+                                    ].map((stat, i) => (
+                                        <div key={i} className={`${stat.bg} p-6 rounded-[2rem] border border-transparent hover:border-slate-200 transition-all text-center group`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="h-8 w-8 bg-white/80 rounded-xl flex items-center justify-center shadow-sm">
+                                                    <i className={`fas ${stat.icon} ${stat.color} text-xs`}></i>
+                                                </div>
+                                            </div>
+                                            <div className={`text-4xl font-black ${stat.color} tracking-tighter`}>{stat.val}</div>
+                                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-2 leading-tight">{stat.label}</div>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-600">Student ID</p>
-                                    <p className="font-medium">{selectedChild.student_id}</p>
+                            ) : (
+                                <div className="text-center py-10 text-slate-300 font-bold uppercase tracking-widest text-xs">Aggregating success metrics...</div>
+                            )}
+                        </div>
+                        {/* Row 2: Finance & Mastery Hub */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                            {/* Finance Card (2/3) */}
+                            <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl shadow-indigo-900/5 border border-slate-100 p-8 flex flex-col justify-between group overflow-hidden relative">
+                                <div className="absolute -top-12 -right-12 w-48 h-48 bg-emerald-50 rounded-full blur-3xl opacity-50 group-hover:scale-110 transition-transform"></div>
+                                <div className="relative z-10 flex items-center justify-between mb-8">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-14 w-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-sm">
+                                            <BanknotesIcon className="h-7 w-7" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black text-[#18216D] tracking-tight italic">Financial Framework</h3>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Tuition & Dues Breakdown</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 px-4 py-2 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm">Financial Status</span>
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-600">Grade</p>
-                                    <p className="font-medium">{selectedChild.grade}</p>
+                                <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div>
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Outstanding Balance</p>
+                                        <h4 className="text-5xl font-black text-[#18216D] tracking-tighter">
+                                            KES {childFinances?.summary?.balance?.toLocaleString() || '0'}
+                                        </h4>
+                                        <div className="mt-6 flex items-center gap-4">
+                                            <button
+                                                onClick={() => navigate(`/parent/child/${selectedChild.id}/finances`)}
+                                                className="bg-[#18216D] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-900/20"
+                                            >
+                                                Make Payment
+                                            </button>
+                                            <button
+                                                onClick={() => navigate(`/parent/child/${selectedChild.id}/finances`)}
+                                                className="text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:underline"
+                                            >
+                                                View Statement
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {childFinances?.fee_frameworks?.length > 0 && (
+                                        <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100/50">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                                Framework Components
+                                            </p>
+                                            <div className="space-y-3">
+                                                {[
+                                                    { label: 'Tuition', val: childFinances.fee_frameworks[0].tuition_amount },
+                                                    { label: 'Material & Books', val: childFinances.fee_frameworks[0].books_amount },
+                                                    { label: 'Transport', val: childFinances.fee_frameworks[0].transport_amount },
+                                                    { label: 'Extracurricular', val: childFinances.fee_frameworks[0].activities_amount }
+                                                ].map((fee, i) => (
+                                                    <div key={i} className="flex justify-between items-center text-xs font-bold">
+                                                        <span className="text-slate-500">{fee.label}</span>
+                                                        <span className="text-[#18216D]">KES {fee.val?.toLocaleString()}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-4 pt-4 border-t border-slate-200/50 flex justify-between items-center">
+                                                <span className="text-[10px] font-black uppercase text-emerald-600">Total Paid</span>
+                                                <span className="text-lg font-black text-emerald-600">KES {childFinances?.summary?.total_paid?.toLocaleString() || '0'}</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <div>
-                                    <p className="text-sm text-gray-600">Email</p>
-                                    <p className="font-medium text-sm">{selectedChild.email}</p>
+                            </div>
+
+                            {/* Mastery Hub (1/3) */}
+                            <div className="bg-[#18216D] rounded-[2.5rem] shadow-2xl shadow-indigo-900/20 p-10 text-white flex flex-col justify-between relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFC425]/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-125 transition-transform duration-700"></div>
+                                <div className="relative z-10">
+                                    <div className="h-16 w-16 bg-white/10 text-white rounded-3xl flex items-center justify-center backdrop-blur-md mb-8 ring-1 ring-white/20 shadow-xl group-hover:rotate-6 transition-transform">
+                                        <AcademicCapIcon className="h-8 w-8 text-[#FFC425] transition-colors" />
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#FFC425] mb-2">Academic Mastery Hub</p>
+                                    <h4 className="text-3xl font-black italic tracking-tighter mb-4 leading-tight">Insight Into Your <br />Scholar's Journey</h4>
+                                    <p className="text-indigo-200/60 text-xs font-medium leading-relaxed mb-8">
+                                        Access complete competency matrices and teacher assessments.
+                                    </p>
+                                </div>
+                                <div className="relative z-10 flex flex-col gap-4">
+                                    <button
+                                        onClick={() => navigate(`/parent/child/${selectedChild.id}/progress`)}
+                                        className="w-full bg-[#FFC425] text-[#18216D] py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[1.03] active:scale-95 transition-all shadow-xl shadow-amber-900/20"
+                                    >
+                                        Full Report View
+                                    </button>
+                                    <div className="flex items-center justify-center p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-[#FFC425]/80 italic">Status: On Track</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Progress Summary */}
-                        {childProgress && (
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-6">
-                                <h2 className="text-xl font-semibold text-gray-900 mb-4">CBC Progress Summary</h2>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                    <div className="bg-white rounded-lg p-4 text-center">
-                                        <div className="text-3xl font-bold text-gray-900">{childProgress.total_assessments}</div>
-                                        <div className="text-sm text-gray-600 mt-1">Total Assessments</div>
+                        {/* Row 3: Calendar (2/3) and Recent Activities (1/3) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                            {/* Calendar (2/3) */}
+                            <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-xl shadow-indigo-900/5">
+                                <div className="flex items-center justify-between mb-10">
+                                    <div>
+                                        <h3 className="text-2xl font-black text-[#18216D] tracking-tight flex items-center gap-3 italic">
+                                            <CalendarIcon className="h-6 w-6 text-[#FFC425]" />
+                                            Scholar Timeline
+                                        </h3>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Deadlines & Upcoming Assessments</p>
                                     </div>
-                                    <div className="bg-white rounded-lg p-4 text-center">
-                                        <div className="text-3xl font-bold text-green-600">{childProgress.by_level?.EE || 0}</div>
-                                        <div className="text-sm text-gray-600 mt-1">Exceeding</div>
+                                    <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100 shadow-inner">
+                                        <button onClick={() => changeMonth(-1)} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm text-slate-400 hover:text-[#18216D]">
+                                            <ChevronLeftIcon className="w-5 h-5" />
+                                        </button>
+                                        <span className="text-sm font-black text-[#18216D] uppercase tracking-widest min-w-[140px] text-center italic">
+                                            {currentDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })}
+                                        </span>
+                                        <button onClick={() => changeMonth(1)} className="p-2.5 hover:bg-white rounded-xl transition-all shadow-sm text-slate-400 hover:text-[#18216D]">
+                                            <ChevronRightIcon className="w-5 h-5" />
+                                        </button>
                                     </div>
-                                    <div className="bg-white rounded-lg p-4 text-center">
-                                        <div className="text-3xl font-bold text-blue-600">{childProgress.by_level?.ME || 0}</div>
-                                        <div className="text-sm text-gray-600 mt-1">Meeting</div>
-                                    </div>
-                                    <div className="bg-white rounded-lg p-4 text-center">
-                                        <div className="text-3xl font-bold text-yellow-600">{childProgress.by_level?.AE || 0}</div>
-                                        <div className="text-sm text-gray-600 mt-1">Approaching</div>
-                                    </div>
-                                    <div className="bg-white rounded-lg p-4 text-center">
-                                        <div className="text-3xl font-bold text-red-600">{childProgress.by_level?.BE || 0}</div>
-                                        <div className="text-sm text-gray-600 mt-1">Below</div>
-                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-7 gap-6">
+                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                        <div key={day} className="text-center text-[10px] font-black text-slate-300 uppercase tracking-widest pb-4">
+                                            {day}
+                                        </div>
+                                    ))}
+                                    {daysInMonth.map((dateObj, idx) => {
+                                        const hasEvents = dateObj.fullDate && eventDates[dateObj.fullDate];
+                                        const isToday = dateObj.fullDate === new Date().toISOString().split('T')[0];
+
+                                        return (
+                                            <div key={idx} className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all ${dateObj.day ? 'hover:bg-slate-50 cursor-pointer group' : ''} ${isToday ? 'bg-[#18216D] text-white shadow-xl shadow-indigo-900/20 scale-105 z-10' : 'text-[#18216D]'}`}>
+                                                {dateObj.day && (
+                                                    <>
+                                                        <span className={`text-base font-black ${isToday ? 'text-white' : 'text-[#18216D]'}`}>{dateObj.day}</span>
+                                                        {hasEvents && (
+                                                            <div className="flex gap-1 mt-1.5">
+                                                                {eventDates[dateObj.fullDate].slice(0, 3).map((ev, i) => (
+                                                                    <div key={i} className={`w-1.5 h-1.5 rounded-full ${ev.is_completed ? 'bg-emerald-500' : 'bg-[#FFC425]'}`} />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {hasEvents && (
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-[100] invisible group-hover:visible bg-[#18216D] text-white p-5 rounded-[1.5rem] shadow-2xl border border-white/10 min-w-[240px] animate-in zoom-in-95 duration-200">
+                                                                <p className="text-[9px] font-black text-indigo-300 uppercase tracking-widest mb-4 border-b border-white/10 pb-2 italic">Tasks for {dateObj.day}</p>
+                                                                <div className="space-y-3">
+                                                                    {eventDates[dateObj.fullDate].map((ev, i) => (
+                                                                        <div key={i} className="flex items-start gap-3 group/item">
+                                                                            <div className={`mt-1 shrink-0 h-4 w-4 bg-white/10 rounded-md flex items-center justify-center`}>
+                                                                                {ev.is_completed ? <CheckCircleIconSolid className="text-emerald-400 w-3 h-3" /> : <div className="w-1.5 h-1.5 bg-amber-400 rounded-full" />}
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <p className="text-[11px] font-black leading-tight italic truncate">{ev.title}</p>
+                                                                                <p className="text-[8px] font-bold text-indigo-300 uppercase tracking-widest mt-0.5">{ev.type}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                <div className="absolute top-full left-1/2 -ml-2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-[#18216D]"></div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
-                        )}
 
-                        {/* Quick Actions */}
-                        <div className="grid md:grid-cols-3 gap-6">
-                            <button
-                                onClick={() => navigate(`/parent/child/${selectedChild.id}/progress`)}
-                                className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow text-left"
-                            >
-                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                    </svg>
+                            {/* Recent Activities (1/3) */}
+                            <div className="bg-white rounded-[2.5rem] shadow-xl shadow-indigo-900/5 border border-slate-100 p-10 flex flex-col group h-full">
+                                <div className="flex items-center justify-between mb-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-12 w-12 bg-[#FFC425]/10 rounded-2xl flex items-center justify-center border border-[#FFC425]/20 group-hover:rotate-6 transition-transform">
+                                            <ClockIcon className="h-6 w-6 text-[#B48A1B]" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-[#18216D] italic tracking-tight">Recent Activity</h3>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live status updates</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <h3 className="font-semibold text-gray-900 mb-2">View Detailed Progress</h3>
-                                <p className="text-sm text-gray-600">See competency development across all learning areas</p>
-                            </button>
 
-                            <button
-                                onClick={() => navigate(`/parent/child/${selectedChild.id}/finances`)}
-                                className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow text-left"
-                            >
-                                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <h3 className="font-semibold text-gray-900 mb-2">Fees & Payments</h3>
-                                <p className="text-sm text-gray-600">View fees, payment history, and balances</p>
-                            </button>
+                                <div className="space-y-6 flex-1 overflow-y-auto custom-scrollbar pr-2">
+                                    {childActivities ? (
+                                        [
+                                            ...(childActivities.assignments || []).map(a => ({ ...a, type: 'Assignment' })),
+                                            ...(childActivities.quizzes || []).map(q => ({ ...q, type: 'Quiz' }))
+                                        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 7).map((item, idx) => (
+                                            <div key={idx} className="flex gap-4 items-start p-4 hover:bg-slate-50 transition-all rounded-2xl group/act">
+                                                <div className={`mt-1 h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all group-hover/act:scale-110 shadow-sm ${item.type === 'Quiz' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                    {item.type === 'Quiz' ? <AcademicCapIcon className="w-6 h-6" /> : <ChartBarIcon className="w-6 h-6" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                            {item.type}
+                                                            {item.is_completed && <CheckCircleIconSolid className="w-3 h-3 text-emerald-500" />}
+                                                        </span>
+                                                        <span className="text-[9px] font-black text-slate-300 uppercase">{new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                                                    </div>
+                                                    <h4 className="font-bold text-[#18216D] text-sm truncate leading-tight">
+                                                        {item.title}
+                                                    </h4>
+                                                    {item.is_completed && <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-1">Status: Completed</p>}
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-20 text-slate-300 font-bold uppercase tracking-[0.2em] text-[10px] italic">Fetching live scholar updates...</div>
+                                    )}
 
-                            <button
-                                onClick={() => navigate(`/parent/messages`)}
-                                className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow text-left"
-                            >
-                                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                    </svg>
+                                    {childActivities && ([...childActivities.assignments, ...childActivities.quizzes].length === 0) && (
+                                        <div className="text-center py-20 text-slate-300 font-bold uppercase tracking-widest text-[10px]">No activities recorded</div>
+                                    )}
                                 </div>
-                                <h3 className="font-semibold text-gray-900 mb-2">Messages</h3>
-                                <p className="text-sm text-gray-600">Communicate with teachers</p>
-                            </button>
+
+                                <div className="mt-8 pt-8 border-t border-slate-50">
+                                    <button
+                                        className="w-full h-20 flex items-center justify-center gap-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 hover:border-[#18216D] hover:text-[#18216D] hover:bg-white transition-all group/comm"
+                                        onClick={() => navigate('/parent/messages')}
+                                    >
+                                        <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover/comm:bg-[#18216D] group-hover/comm:text-[#FFC425] transition-all">
+                                            <i className="fas fa-envelopes-bulk text-xs"></i>
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-[10px] font-black uppercase tracking-widest">Communications Hub</p>
+                                            <p className="text-[9px] font-bold text-slate-400 mt-0.5">Contact Faculty Desk</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </>
+                    </div>
                 )}
-            </div>
+            </main>
         </div>
     );
 };

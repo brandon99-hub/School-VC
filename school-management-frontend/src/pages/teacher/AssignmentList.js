@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
 import AssignmentCreator from '../../components/teacher/AssignmentCreator';
@@ -15,11 +15,7 @@ const AssignmentList = ({ courseId }) => {
     const [gradingSubmissions, setGradingSubmissions] = useState([]);
     const [currentSubmissionIndex, setCurrentSubmissionIndex] = useState(0);
 
-    useEffect(() => {
-        fetchAssignments();
-    }, [courseId]);
-
-    const fetchAssignments = async () => {
+    const fetchAssignments = useCallback(async () => {
         try {
             setLoading(true);
             const response = await get(`/api/cbc/learning-areas/${courseId}/assignments/`);
@@ -30,7 +26,11 @@ const AssignmentList = ({ courseId }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [courseId, get]);
+
+    useEffect(() => {
+        fetchAssignments();
+    }, [fetchAssignments]);
 
     const handleCreateAssignment = () => {
         setEditingAssignment(null);
@@ -172,9 +172,20 @@ const AssignmentList = ({ courseId }) => {
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                             </svg>
-                                            <span>0 submissions</span>
+                                            <span>{assignment.submission_count || 0} submissions</span>
                                         </div>
                                     </div>
+
+                                    {assignment.tested_outcomes_detail?.length > 0 && (
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            {assignment.tested_outcomes_detail.map((o, i) => (
+                                                <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#FFC425]"></div>
+                                                    <span className="text-[10px] font-bold text-[#18216D] italic leading-tight">{o.description}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Actions */}

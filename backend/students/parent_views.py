@@ -2,6 +2,8 @@
 Views for Parent authentication and management
 """
 
+from django.db import models
+from django.db.models import Exists, OuterRef
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -9,6 +11,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from core.email_utils import send_welcome_email
 
 from .models import Parent, Student
 from .parent_serializers import (
@@ -18,6 +21,11 @@ from .parent_serializers import (
     ParentProfileUpdateSerializer,
     AddChildSerializer
 )
+from cbc.report_generator import generate_student_report
+from finance.models import StudentFee, Payment, Invoice, FeeStructure
+from finance.serializers import StudentFeeSerializer, PaymentSerializer, InvoiceSerializer, FeeStructureSerializer
+from courses.models import Assignment, Quiz, AssignmentSubmission, QuizSubmission
+from courses.serializers import AssignmentSerializer, QuizSerializer
 
 
 @api_view(['POST'])
@@ -29,7 +37,29 @@ def parent_register(request):
     """
     serializer = ParentRegistrationSerializer(data=request.data)
     if serializer.is_valid():
+        password = request.data.get('password') # Get the raw password to send via email
+        student_ids_raw = request.data.get('student_ids', [])
         parent = serializer.save()
+        
+        # Link students if provided
+        if student_ids_raw:
+            # Handle list of strings or comma-separated string
+            if isinstance(student_ids_raw, str):
+                student_ids = [int(id.strip()) for id in student_ids_raw.split(',') if id.strip().isdigit()]
+            else:
+                student_ids = [int(id) for id in student_ids_raw if str(id).isdigit()]
+                
+            students = Student.objects.filter(id__in=student_ids)
+            parent.children.set(students)
+            parent.save()
+        
+        # Send welcome email
+        send_welcome_email(
+            user_email=parent.email,
+            first_name=parent.first_name,
+            password=password,
+            role='parent'
+        )
         
         # Generate JWT tokens
         refresh = RefreshToken()
@@ -217,4 +247,188 @@ class ParentViewSet(viewsets.ModelViewSet):
         return Response({
             'message': f'Successfully removed {student.get_full_name()} from your account',
             'parent': ParentSerializer(parent).data
+        })
+
+    @action(detail=False, methods=['get'], url_path='child-report/(?P<child_id>[^/.]+)')
+    def child_report(self, request, child_id=None):
+        """
+        Get CBC report for a specific child
+        GET /api/parents/child-report/{child_id}/
+        """
+        if not hasattr(request, 'parent_id'):
+            return Response({'error': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        parent = get_object_or_404(Parent, id=request.parent_id)
+        child = get_object_or_404(Student, id=child_id)
+        
+        if child not in parent.children.all():
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            report_data = generate_student_report(child.id)
+            return Response(report_data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'], url_path='child-finances/(?P<child_id>[^/.]+)')
+    def child_finances(self, request, child_id=None):
+        """
+        Get financial records for a specific child with detailed breakdown
+        GET /api/parents/child-finances/{child_id}/
+        """
+        if not hasattr(request, 'parent_id'):
+            return Response({'error': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        parent = get_object_or_404(Parent, id=request.parent_id)
+        child = get_object_or_404(Student, id=child_id)
+        
+        if child not in parent.children.all():
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Fetch fees, payments, and invoices
+        fees = StudentFee.objects.filter(student=child)
+        payments = Payment.objects.filter(student_fee__student=child)
+        invoices = Invoice.objects.filter(student_fee__student=child)
+        
+        # Get the active fee structure/framework details
+        fee_structure_data = []
+        if fees.exists():
+            # Get structures for the child's grade level
+            structures = FeeStructure.objects.filter(grade_level=child.grade_level, is_active=True).order_by('-academic_year', '-term')
+            fee_structure_data = FeeStructureSerializer(structures, many=True).data
+
+        return Response({
+            'fees': StudentFeeSerializer(fees, many=True).data,
+            'payments': PaymentSerializer(payments, many=True).data,
+            'invoices': InvoiceSerializer(invoices, many=True).data,
+            'fee_frameworks': fee_structure_data,
+            'summary': {
+                'total_fees': sum(f.final_amount for f in fees),
+                'total_paid': sum(f.amount_paid for f in fees),
+                'balance': sum(f.balance for f in fees)
+            }
+        })
+
+    @action(detail=False, methods=['get'], url_path='child-activities/(?P<child_id>[^/.]+)')
+    def child_activities(self, request, child_id=None):
+        """
+        Get most recent activities (assignments and quizzes) for a child with completion status
+        """
+        if not hasattr(request, 'parent_id'):
+            return Response({'error': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        parent = get_object_or_404(Parent, id=request.parent_id)
+        child = get_object_or_404(Student, id=child_id)
+        
+        if child not in parent.children.all():
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Assignment completion check
+        assignment_submissions = AssignmentSubmission.objects.filter(
+            assignment=OuterRef('pk'),
+            student=child
+        )
+        
+        # Get recent assignments
+        assignments = Assignment.objects.filter(
+            models.Q(learning_area__grade_level=child.grade_level) | 
+            models.Q(learning_area__students=child) |
+            models.Q(course__students=child)
+        ).distinct().annotate(
+            is_completed=Exists(assignment_submissions)
+        ).order_by('-created_at')[:10]
+
+        # Quiz completion check
+        quiz_submissions = QuizSubmission.objects.filter(
+            quiz=OuterRef('pk'),
+            student=child
+        )
+
+        # Get recent quizzes
+        quizzes = Quiz.objects.filter(
+            models.Q(learning_area__grade_level=child.grade_level) |
+            models.Q(learning_area__students=child) |
+            models.Q(lesson__module__learning_area__grade_level=child.grade_level) |
+            models.Q(lesson__module__learning_area__students=child)
+        ).distinct().annotate(
+            is_completed=Exists(quiz_submissions)
+        ).order_by('-created_at')[:10]
+
+        # Use partial serialization or ensure the serializer handles the annotation if possible, 
+        # but since we are using existing serializers, we might need to manually inject or ensure they exist.
+        # However, it's safer to just send the data with a small wrapper if serializer is strict.
+        
+        # We'll update the serializer later or just manually map here for the activity feed.
+        asgn_data = AssignmentSerializer(assignments, many=True).data
+        for i, a in enumerate(assignments):
+            asgn_data[i]['is_completed'] = a.is_completed
+
+        quiz_data = QuizSerializer(quizzes, many=True).data
+        for i, q in enumerate(quizzes):
+            quiz_data[i]['is_completed'] = q.is_completed
+
+        return Response({
+            'assignments': asgn_data,
+            'quizzes': quiz_data
+        })
+
+    @action(detail=False, methods=['get'], url_path='child-calendar/(?P<child_id>[^/.]+)')
+    def child_calendar(self, request, child_id=None):
+        """
+        Get all upcoming events for the calendar (assignments and quizzes with due dates)
+        """
+        if not hasattr(request, 'parent_id'):
+            return Response({'error': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        parent = get_object_or_404(Parent, id=request.parent_id)
+        child = get_object_or_404(Student, id=child_id)
+        
+        if child not in parent.children.all():
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Assignment completion check
+        asgn_submissions = AssignmentSubmission.objects.filter(
+            assignment=OuterRef('pk'),
+            student=child
+        )
+
+        # Fetch everything with a due date
+        assignments = Assignment.objects.filter(
+            due_date__isnull=False
+        ).filter(
+            models.Q(learning_area__grade_level=child.grade_level) | 
+            models.Q(learning_area__students=child) |
+            models.Q(course__students=child)
+        ).distinct().annotate(
+            is_completed=Exists(asgn_submissions)
+        )
+
+        # Quiz completion check
+        qz_submissions = QuizSubmission.objects.filter(
+            quiz=OuterRef('pk'),
+            student=child
+        )
+
+        quizzes = Quiz.objects.filter(
+            due_date__isnull=False
+        ).filter(
+            models.Q(learning_area__grade_level=child.grade_level) |
+            models.Q(learning_area__students=child) |
+            models.Q(lesson__module__learning_area__grade_level=child.grade_level) |
+            models.Q(lesson__module__learning_area__students=child)
+        ).distinct().annotate(
+            is_completed=Exists(qz_submissions)
+        )
+
+        asgn_data = AssignmentSerializer(assignments, many=True).data
+        for i, a in enumerate(assignments):
+            asgn_data[i]['is_completed'] = a.is_completed
+
+        quiz_data = QuizSerializer(quizzes, many=True).data
+        for i, q in enumerate(quizzes):
+            quiz_data[i]['is_completed'] = q.is_completed
+
+        return Response({
+            'assignments': asgn_data,
+            'quizzes': quiz_data
         })

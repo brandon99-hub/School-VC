@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useApi } from '../../hooks/useApi';
 
 const PaymentRecording = () => {
     const navigate = useNavigate();
+    const { get, post } = useApi();
     const [students, setStudents] = useState([]);
     const [studentFees, setStudentFees] = useState([]);
     const [selectedStudent, setSelectedStudent] = useState('');
@@ -18,41 +19,43 @@ const PaymentRecording = () => {
         notes: ''
     });
     const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showStudentList, setShowStudentList] = useState(false);
+
+    const fetchStudents = useCallback(async () => {
+        try {
+            const response = await get('/api/students/');
+            setStudents(response || []);
+        } catch (error) {
+            console.error('Error fetching students:', error);
+        }
+    }, [get]);
 
     useEffect(() => {
         fetchStudents();
-    }, []);
+    }, [fetchStudents]);
+
+    const fetchStudentFees = useCallback(async () => {
+        try {
+            const response = await get(`/api/finance/student-fees/?student=${selectedStudent}`);
+            setStudentFees((response || []).filter(fee => fee.balance > 0));
+        } catch (error) {
+            console.error('Error fetching student fees:', error);
+        }
+    }, [selectedStudent, get]);
 
     useEffect(() => {
         if (selectedStudent) {
             fetchStudentFees();
         }
-    }, [selectedStudent]);
-
-    const fetchStudents = async () => {
-        try {
-            const response = await axios.get('/api/students/');
-            setStudents(response.data);
-        } catch (error) {
-            console.error('Error fetching students:', error);
-        }
-    };
-
-    const fetchStudentFees = async () => {
-        try {
-            const response = await axios.get(`/api/finance/student-fees/?student=${selectedStudent}`);
-            setStudentFees(response.data.filter(fee => fee.balance > 0));
-        } catch (error) {
-            console.error('Error fetching student fees:', error);
-        }
-    };
+    }, [selectedStudent, fetchStudentFees]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            await axios.post('/api/finance/payment/record/', {
+            await post('/api/finance/payment/record/', {
                 student_fee: selectedFee,
                 ...formData
             });
@@ -90,6 +93,11 @@ const PaymentRecording = () => {
         }).format(amount);
     };
 
+    const filteredStudents = (students || []).filter(s =>
+        `${s.first_name} ${s.last_name} ${s.student_id}`.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const selectedStudentData = students.find(s => s.id === parseInt(selectedStudent));
     const selectedFeeDetails = studentFees.find(f => f.id === parseInt(selectedFee));
 
     return (
@@ -111,24 +119,81 @@ const PaymentRecording = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Student Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Select Student</label>
-                        <select
-                            value={selectedStudent}
-                            onChange={(e) => {
-                                setSelectedStudent(e.target.value);
-                                setSelectedFee('');
-                            }}
-                            required
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">Choose a student...</option>
-                            {students.map(student => (
-                                <option key={student.id} value={student.id}>
-                                    {student.first_name} {student.last_name} - {student.student_id}
-                                </option>
-                            ))}
-                        </select>
+                    {/* Student Selection (Searchable) */}
+                    <div className="relative">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Search Scholar (Name or ID)</label>
+                        <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#18216D] transition-colors">
+                                <i className="fas fa-search"></i>
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Type Brandon, 00863, etc..."
+                                value={searchTerm || (selectedStudentData ? `${selectedStudentData.first_name} ${selectedStudentData.last_name}` : '')}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setShowStudentList(true);
+                                }}
+                                onFocus={() => setShowStudentList(true)}
+                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent focus:border-[#18216D] focus:bg-white rounded-2xl transition-all font-black text-sm outline-none"
+                            />
+                            {selectedStudent && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedStudent('');
+                                        setSearchTerm('');
+                                        setSelectedFee('');
+                                    }}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500"
+                                >
+                                    <i className="fas fa-times-circle"></i>
+                                </button>
+                            )}
+                        </div>
+
+                        {showStudentList && searchTerm && !selectedStudent && (
+                            <div className="absolute z-[100] w-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                                {filteredStudents.length > 0 ? (
+                                    filteredStudents.map(student => (
+                                        <button
+                                            key={student.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedStudent(student.id);
+                                                setSearchTerm('');
+                                                setShowStudentList(false);
+                                                setSelectedFee('');
+                                            }}
+                                            className="w-full px-6 py-4 text-left hover:bg-slate-50 flex items-center justify-between border-b border-slate-50 last:border-0 group"
+                                        >
+                                            <div>
+                                                <p className="font-black text-[#18216D] text-sm group-hover:translate-x-1 transition-transform">{student.first_name} {student.last_name}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{student.student_id} • Grade {student.grade}</p>
+                                            </div>
+                                            <i className="fas fa-chevron-right text-[10px] text-slate-200 group-hover:text-[#18216D] group-hover:translate-x-1 transition-all"></i>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="p-6 text-center text-slate-400 italic text-sm">No scholars found matching "{searchTerm}"</div>
+                                )}
+                            </div>
+                        )}
+
+                        {selectedStudent && !searchTerm && (
+                            <div className="mt-3 p-4 bg-[#18216D]/5 rounded-2xl border border-[#18216D]/10 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-10 w-10 bg-[#18216D] text-white rounded-xl flex items-center justify-center font-black">
+                                        {selectedStudentData?.first_name?.[0]}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-black text-[#18216D]">{selectedStudentData?.first_name} {selectedStudentData?.last_name}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedStudentData?.student_id}</p>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-emerald-100">Selected</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Fee Selection */}

@@ -6,15 +6,18 @@ import {
     ArrowUpTrayIcon,
     ClipboardDocumentListIcon,
     InformationCircleIcon,
-    LightBulbIcon
+    LightBulbIcon,
+    CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
-const AssignmentSubmission = ({ assignment, onClose, onSubmit }) => {
+const AssignmentSubmission = ({ assignment, hasSubmitted: propHasSubmitted, onClose, onSubmit }) => {
     const { post } = useApi();
     const { showToast } = useAppState();
     const [file, setFile] = useState(null);
-    const [textSubmission, setTextSubmission] = useState('');
+    const [textSubmission, setTextSubmission] = useState(assignment.existing_submission?.text_response || '');
     const [submitting, setSubmitting] = useState(false);
+
+    const hasSubmitted = propHasSubmitted || assignment.has_submitted;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -28,14 +31,20 @@ const AssignmentSubmission = ({ assignment, onClose, onSubmit }) => {
             setSubmitting(true);
             const formData = new FormData();
             formData.append('assignment', assignment.id);
-            formData.append('text_submission', textSubmission);
+            formData.append('text_response', textSubmission);
             if (file) {
                 formData.append('file', file);
             }
 
-            await post('/courses/assignment-submissions/', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            if (assignment.existing_submission?.id) {
+                await post(`/courses/assignment-submissions/${assignment.existing_submission.id}/update_submission/`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            } else {
+                await post('/courses/assignment-submissions/', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+            }
 
             // Celebration Toast
             showToast('🎉 Excellent! Your work has been handed in successfully.', 'success');
@@ -54,14 +63,14 @@ const AssignmentSubmission = ({ assignment, onClose, onSubmit }) => {
 
     return (
         <div className="fixed inset-0 bg-[#18216D]/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full overflow-hidden border border-white/20 animate-in zoom-in-95 duration-300">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
                 {/* Header */}
-                <div className="px-8 pt-8 pb-6 flex justify-between items-start">
+                <div className="px-8 pt-8 pb-6 flex justify-between items-start flex-shrink-0">
                     <div>
                         <div className="flex items-center gap-2 mb-2">
                             <span className="bg-[#FFC425]/10 text-[#18216D] text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest border border-[#FFC425]/20 flex items-center gap-1.5">
                                 <ClipboardDocumentListIcon className="w-3.5 h-3.5" />
-                                Assessment Submission
+                                {assignment.existing_submission ? 'Update Assessment Submission' : 'Assessment Submission'}
                             </span>
                         </div>
                         <h2 className="text-3xl font-black text-[#18216D] tracking-tight">{assignment.title}</h2>
@@ -74,7 +83,7 @@ const AssignmentSubmission = ({ assignment, onClose, onSubmit }) => {
                     </button>
                 </div>
 
-                <div className="px-8 pb-8 space-y-6">
+                <div className="px-8 pb-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                     {/* Minimal Task Card */}
                     {assignment.description && (
                         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex gap-3 items-start">
@@ -100,7 +109,7 @@ const AssignmentSubmission = ({ assignment, onClose, onSubmit }) => {
                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                     <ArrowUpTrayIcon className="w-8 h-8 text-slate-300 mb-2 group-hover:text-[#FFC425] transition-colors" />
                                     <p className="text-xs font-bold text-slate-500 group-hover:text-[#18216D]">
-                                        {file ? file.name : 'Tap to select or drag your file here'}
+                                        {file ? file.name : assignment.existing_submission?.file ? 'Existing File (Tap to replace)' : 'Tap to select or drag your file here'}
                                     </p>
                                 </div>
                                 <input
@@ -146,17 +155,25 @@ const AssignmentSubmission = ({ assignment, onClose, onSubmit }) => {
                             </button>
                             <button
                                 type="submit"
-                                disabled={submitting}
-                                className="flex-[2] py-4 bg-[#18216D] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#0D164F] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-indigo-900/20 flex items-center justify-center gap-2"
+                                disabled={submitting || (hasSubmitted && !assignment.existing_submission) || (hasSubmitted && assignment.existing_submission?.status === 'graded')}
+                                className={`flex-[2] py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 ${hasSubmitted && assignment.existing_submission?.status === 'graded'
+                                    ? 'bg-emerald-500 text-white cursor-default shadow-emerald-900/20'
+                                    : 'bg-[#18216D] text-white hover:bg-[#0D164F] disabled:opacity-50 disabled:cursor-not-allowed shadow-indigo-900/20'
+                                    }`}
                             >
                                 {submitting ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                         Submitting...
                                     </>
+                                ) : (hasSubmitted && assignment.existing_submission?.status === 'graded') ? (
+                                    <>
+                                        Assignment Graded
+                                        <CheckCircleIcon className="w-4 h-4" />
+                                    </>
                                 ) : (
                                     <>
-                                        Submit Assignment
+                                        {assignment.existing_submission ? 'Update Submission' : 'Submit Assignment'}
                                         <ClipboardDocumentListIcon className="w-4 h-4" />
                                     </>
                                 )}

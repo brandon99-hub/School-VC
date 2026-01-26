@@ -47,7 +47,15 @@ class DynamicUserRegistrationSerializer(serializers.Serializer):
             gender = validated_data.pop('gender', None)
             address = validated_data.pop('address', '')
             phone = validated_data.pop('phone', '')
-            grade = validated_data.pop('grade', '')
+            grade_str = validated_data.pop('grade', '')
+            
+            # Map grade string to GradeLevel object
+            grade_level = None
+            if grade_str:
+                from cbc.models import GradeLevel
+                # Try exact match or clean match (e.g. "Grade 4" -> "Grade 4")
+                grade_level = GradeLevel.objects.filter(name__icontains=grade_str).first()
+
             student = Student.objects.create_user(
                 student_id=student_id,
                 password=password,
@@ -58,7 +66,8 @@ class DynamicUserRegistrationSerializer(serializers.Serializer):
                 gender=gender,
                 address=address,
                 phone=phone,
-                grade=grade
+                grade=grade_str,
+                grade_level=grade_level
             )
             return student
         elif role == 'teacher':

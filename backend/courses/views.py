@@ -14,7 +14,10 @@ from .models import (
     Assignment,
     AssignmentSubmission,
     Attendance,
+    Quiz,
+    QuizSubmission,
     Course,
+    Module,
     DiscussionComment,
     DiscussionThread,
     Grade,
@@ -29,6 +32,7 @@ from .models import (
 )
 from students.models import Student
 from teachers.models import Teacher
+from cbc.models import LearningArea, CompetencyAssessment
 from datetime import datetime, timedelta
 from .serializers import (
     AssignmentSerializer,
@@ -45,7 +49,9 @@ from .serializers import (
     QuizResponseSerializer,
     QuizSerializer,
     QuizSubmissionSerializer,
+    ScheduleSerializer,
 )
+from rest_framework import serializers
 
 def is_admin_or_teacher(user):
     return user.is_superuser or hasattr(user, 'teacher')
@@ -346,13 +352,16 @@ class CourseViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def modules(self, request, pk=None):
         course = self.get_object()
-        modules = course.module_set.all().order_by('order')
+        if course.learning_area:
+            modules = Module.objects.filter(learning_area=course.learning_area).order_by('order')
+        else:
+            modules = Module.objects.none()
         serializer = ModuleSerializer(modules, many=True)
         return Response(serializer.data)
 
 
 class ModuleViewSet(viewsets.ModelViewSet):
-    queryset = Module.objects.select_related('course')
+    queryset = Module.objects.select_related('learning_area')
     serializer_class = ModuleSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -360,12 +369,12 @@ class ModuleViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         course_id = self.request.query_params.get('course')
         if course_id:
-            queryset = queryset.filter(course_id=course_id)
+            queryset = queryset.filter(learning_area__assigned_courses__id=course_id)
         return queryset
 
 
 class LessonViewSet(viewsets.ModelViewSet):
-    queryset = Lesson.objects.select_related('module', 'module__course')
+    queryset = Lesson.objects.select_related('module', 'module__learning_area')
     serializer_class = LessonSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -378,7 +387,7 @@ class LessonViewSet(viewsets.ModelViewSet):
 
 
 class LessonContentViewSet(viewsets.ModelViewSet):
-    queryset = LessonContent.objects.select_related('lesson', 'lesson__module')
+    queryset = LessonContent.objects.select_related('lesson', 'lesson__module', 'lesson__module__learning_area')
     serializer_class = LessonContentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -391,7 +400,7 @@ class LessonContentViewSet(viewsets.ModelViewSet):
 
 
 class QuizViewSet(viewsets.ModelViewSet):
-    queryset = Quiz.objects.select_related('lesson', 'lesson__module__course')
+    queryset = Quiz.objects.select_related('lesson', 'lesson__module__learning_area', 'learning_area')
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -420,9 +429,15 @@ class QuizSubmissionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         student = self.request.user
         quiz = serializer.validated_data['quiz']
-        attempt_number = (
-            QuizSubmission.objects.filter(quiz=quiz, student=student).count() + 1
-        )
+        
+        # Check attempts
+        attempts_count = QuizSubmission.objects.filter(quiz=quiz, student=student).count()
+        if attempts_count >= quiz.max_attempts:
+            raise serializers.ValidationError(
+                {"detail": f"You have already reached the maximum allowance of {quiz.max_attempts} attempts for this assessment."}
+            )
+            
+        attempt_number = attempts_count + 1
         serializer.save(student=student, attempt_number=attempt_number)
 
 
@@ -466,6 +481,30 @@ class AssignmentSubmissionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(student=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def update_submission(self, request, pk=None):
+        submission = self.get_object()
+        if submission.student != request.user and not request.user.is_superuser:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if submission.status == 'graded':
+            return Response({'error': 'Cannot update a graded submission'}, status=status.HTTP_400_BAD_REQUEST)
+
+        text_response = request.data.get('text_response')
+        file_obj = request.FILES.get('file')
+
+        if text_response:
+            submission.text_response = text_response
+        
+        if file_obj:
+            # In a real app, you'd handle file storage correctly (S3, Cloudinary etc.)
+            # For this local demo, we'll just store the name or a mock URL
+            submission.file_url = f"/media/submissions/{file_obj.name}"
+            # Logic to save file locally would go here if needed
+            
+        submission.save()
+        return Response(AssignmentSubmissionSerializer(submission).data)
 
 
 class DiscussionThreadViewSet(viewsets.ModelViewSet):
@@ -592,6 +631,10 @@ def course_detail_api(request, pk):
                     status=status.HTTP_403_FORBIDDEN
                 )
 
+            # Get all quizzes for this learning area
+            quizzes_qs = Quiz.objects.filter(learning_area=area, is_published=True)
+            quizzes_data = QuizSerializer(quizzes_qs, many=True).data
+
             # Map LearningArea to CourseDetail expected structure
             data = {
                 'id': area.id,
@@ -603,14 +646,16 @@ def course_detail_api(request, pk):
                 'is_active': area.is_active,
                 'modules': [],
                 'assignments': TeacherAssignmentSerializer(area.assignments.all(), many=True).data,
+                'quizzes': quizzes_data,
                 'schedules': [], # CBC schedule handled differently or TBD
                 'discussion_threads': [],
-                'student_submissions': {'assignments': [], 'quizzes': []},
+                'assignment_submissions': [], 
+                'quiz_submissions': [],
                 'student_progress': {'completed_quizzes': 0, 'attempted_quizzes': 0, 'published_lessons': 0},
                 'learning_summary': {
                     'total_lessons': 0,
                     'published_lessons': 0,
-                    'quiz_count': 0
+                    'quiz_count': quizzes_qs.count()
                 }
             }
 
@@ -642,7 +687,7 @@ def course_detail_api(request, pk):
                             }
                             for outcome in sub.learning_outcomes.all().order_by('order')
                         ],
-                        'quizzes': []
+                        'quizzes': QuizSerializer(Quiz.objects.filter(lesson_id=None, learning_area=area, learning_outcome__sub_strand=sub, is_published=True), many=True).data
                     }
                     module['lessons'].append(lesson)
                 
@@ -653,11 +698,39 @@ def course_detail_api(request, pk):
             
             # Fetch user submissions for this learning area
             if not request.user.is_superuser and not hasattr(request.user, 'teacher'):
+                from .serializers import AssignmentSubmissionSerializer, QuizSubmissionSerializer
+                from .models import AssignmentSubmission, QuizSubmission
+                
                 sub_data = AssignmentSubmission.objects.filter(
                     assignment__learning_area=area,
                     student=request.user
                 )
-                data['student_submissions']['assignments'] = AssignmentSubmissionSerializer(sub_data, many=True).data
+                data['assignment_submissions'] = AssignmentSubmissionSerializer(sub_data, many=True).data
+                
+                quiz_subs = QuizSubmission.objects.filter(
+                    quiz__learning_area=area,
+                    student=request.user
+                ) if not area.assigned_courses.exists() else QuizSubmission.objects.filter(
+                    quiz__lesson__module__learning_area=area,
+                    student=request.user
+                )
+                
+                # Consolidate quiz submissions
+                all_quiz_subs = quiz_subs | QuizSubmission.objects.filter(quiz__learning_area=area, student=request.user)
+                all_quiz_subs = all_quiz_subs.distinct()
+
+                data['quiz_submissions'] = QuizSubmissionSerializer(all_quiz_subs, many=True).data
+                data['student_submissions'] = {
+                    'assignments': data['assignment_submissions'],
+                    'quizzes': data['quiz_submissions']
+                }
+
+                # Update progress
+                data['student_progress'] = {
+                    'completed_quizzes': all_quiz_subs.filter(status__in=['graded', 'auto_graded']).values('quiz_id').distinct().count(),
+                    'attempted_quizzes': all_quiz_subs.values('quiz_id').distinct().count(),
+                    'published_lessons': total_lessons,
+                }
 
             return Response(data)
 
@@ -739,19 +812,41 @@ def submit_grade_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def course_gradebook_api(request, pk):
-    """Get complete gradebook for a course with all students and their grades"""
-    try:
-        course = Course.objects.get(pk=pk)
-    except Course.DoesNotExist:
-        return Response({'error': 'Course not found'}, status=404)
+    """Get complete gradebook for a course or learning area with all students and their grades"""
+    course = None
+    learning_area = None
     
-    # Permission check - only teacher of course or admin
-    if not (request.user.is_superuser or 
-            (hasattr(request.user, 'teacher') and course.teacher == request.user.teacher)):
+    # Try finding as LearningArea first (CBC subjects)
+    try:
+        learning_area = LearningArea.objects.get(pk=pk)
+    except LearningArea.DoesNotExist:
+        # Try finding as Course (8-4-4 legacy)
+        try:
+            course = Course.objects.get(pk=pk)
+        except Course.DoesNotExist:
+            return Response({'error': 'Subject or Course not found'}, status=404)
+    
+    # Permission check - only teacher of course/area or admin
+    is_teacher = False
+    if hasattr(request.user, 'teacher'):
+        if learning_area:
+            is_teacher = (learning_area.teacher == request.user.teacher)
+        elif course:
+            is_teacher = (course.teacher == request.user.teacher)
+            
+    if not (request.user.is_superuser or is_teacher):
         return Response({'error': 'Permission denied'}, status=403)
     
-    students = course.students.all()
-    assignments = course.assignment_set.all().order_by('due_date')
+    # Resolve data sources
+    if learning_area:
+        students = learning_area.students.all()
+        assignments = learning_area.assignments.all().order_by('due_date')
+        quizzes = Quiz.objects.filter(learning_area=learning_area).order_by('id')
+    else:
+        students = course.students.all()
+        # For legacy courses, we might have assignments linked to either the course or its learning area
+        assignments = course.assignment_set.all().order_by('due_date')
+        quizzes = Quiz.objects.filter(learning_area=course.learning_area).order_by('id') if course.learning_area else Quiz.objects.none()
     
     gradebook = []
     for student in students:
@@ -760,11 +855,14 @@ def course_gradebook_api(request, pk):
             'student_name': student.get_full_name(),
             'email': student.email,
             'student_number': student.student_id,
-            'grades': {}
+            'grades': {},
+            'quiz_grades': {}
         }
         
+        # Assignment Grades
         for assignment in assignments:
             try:
+                # Try to find a traditional numerical grade first
                 grade = Grade.objects.get(student=student, assignment=assignment)
                 student_data['grades'][str(assignment.id)] = {
                     'score': float(grade.score),
@@ -772,13 +870,48 @@ def course_gradebook_api(request, pk):
                     'grade_id': grade.id
                 }
             except Grade.DoesNotExist:
-                student_data['grades'][str(assignment.id)] = None
+                # Fallback for CBC: Check if there's a competency assessment for this outcome
+                if assignment.learning_outcome:
+                    assessment = CompetencyAssessment.objects.filter(
+                        student=student,
+                        learning_outcome=assignment.learning_outcome
+                    ).order_by('-assessment_date').first()
+                    
+                    if assessment:
+                        student_data['grades'][str(assignment.id)] = {
+                            'score': 0, # CBC uses labels not numerical scores in this view
+                            'letter_grade': assessment.competency_level,
+                            'grade_id': assessment.id
+                        }
+                    else:
+                        student_data['grades'][str(assignment.id)] = None
+                else:
+                    student_data['grades'][str(assignment.id)] = None
+        
+        # Quiz Grades (Highest score per quiz)
+        for quiz in quizzes:
+            submission = QuizSubmission.objects.filter(
+                student=student, 
+                quiz=quiz, 
+                status__in=['graded', 'auto_graded']
+            ).order_by('-score').first()
+            
+            if submission:
+                student_data['quiz_grades'][str(quiz.id)] = {
+                    'score': float(submission.score or 0),
+                    'total': float(quiz.total_points),
+                    'status': submission.status,
+                    'submission_id': submission.id
+                }
+            else:
+                student_data['quiz_grades'][str(quiz.id)] = None
         
         gradebook.append(student_data)
     
     return Response({
         'students': gradebook,
-        'assignments': AssignmentSerializer(assignments, many=True).data
+        'assignments': AssignmentSerializer(assignments, many=True).data,
+        'quizzes': QuizSerializer(quizzes, many=True).data
     })
 
 @api_view(['PUT'])

@@ -75,7 +75,13 @@ class Assignment(models.Model):
         null=True,
         blank=True,
         related_name='assignments',
-        help_text="Specific learning outcome being assessed"
+        help_text="Primary learning outcome being assessed (deprecated in favor of tested_outcomes)"
+    )
+    tested_outcomes = models.ManyToManyField(
+        'cbc.LearningOutcome',
+        blank=True,
+        related_name='assignments_m2m',
+        help_text="Learning outcomes being assessed"
     )
     assessment_type = models.CharField(
         max_length=20,
@@ -83,6 +89,7 @@ class Assignment(models.Model):
         default='formative',
         help_text="Type of CBC assessment"
     )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['due_date']
@@ -95,7 +102,16 @@ class Assignment(models.Model):
     @property
     def is_cbc(self):
         """Returns True if this is a CBC assignment"""
-        return self.learning_outcome is not None
+        return self.learning_outcome is not None or self.tested_outcomes.exists()
+
+    @property
+    def teacher_id(self):
+        """Resolves the teacher ID for this assignment"""
+        if self.learning_area and self.learning_area.teacher:
+            return self.learning_area.teacher.id
+        if self.course and self.course.teacher:
+            return self.course.teacher.id
+        return None
 
 class Schedule(models.Model):
     DAY_CHOICES = [
@@ -197,12 +213,13 @@ class LessonContent(models.Model):
 
 
 class Quiz(models.Model):
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='quizzes')
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='quizzes', null=True, blank=True)
     title = models.CharField(max_length=200)
     instructions = models.TextField(blank=True)
     time_limit_minutes = models.PositiveIntegerField(default=0)
     max_attempts = models.PositiveIntegerField(default=1)
     is_published = models.BooleanField(default=False)
+    due_date = models.DateTimeField(null=True, blank=True)
 
     # CBC fields
     learning_area = models.ForeignKey(
@@ -218,14 +235,25 @@ class Quiz(models.Model):
         null=True,
         blank=True,
         related_name='quizzes',
-        help_text="Specific learning outcome being assessed"
+        help_text="Primary learning outcome being assessed (deprecated in favor of tested_outcomes)"
     )
+    tested_outcomes = models.ManyToManyField(
+        'cbc.LearningOutcome',
+        blank=True,
+        related_name='quizzes_m2m',
+        help_text="Learning outcomes being assessed"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['lesson', 'title']
 
     def __str__(self):
-        return f"{self.lesson.title} · {self.title}"
+        return f"{self.lesson.title if self.lesson else (self.learning_area.name if self.learning_area else 'N/A')} · {self.title}"
+
+    @property
+    def total_points(self):
+        return sum(q.points for q in self.questions.all())
 
 
 class QuizQuestion(models.Model):
@@ -313,6 +341,7 @@ class AssignmentSubmission(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='assignment_submissions')
     submitted_at = models.DateTimeField(auto_now_add=True)
     file_url = models.URLField(blank=True)
+    file = models.FileField(upload_to='submissions/', blank=True, null=True)
     text_response = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='submitted')
     feedback = models.TextField(blank=True)

@@ -98,9 +98,27 @@ class LearningAreaViewSet(viewsets.ModelViewSet):
         """
         Get all enrolled students for a learning area
         GET /api/cbc/learning-areas/{id}/students/
+        Optional: ?exclude_assessed_assignment=ID
         """
         learning_area = self.get_object()
         students = learning_area.students.all()
+        
+        # Filter out students who have already been assessed for this assignment's outcome
+        assignment_id = request.query_params.get('exclude_assessed_assignment')
+        if assignment_id:
+            from courses.models import Assignment
+            try:
+                assignment = Assignment.objects.get(id=assignment_id)
+                if assignment.learning_outcome:
+                    # Get IDs of students already assessed for this outcome
+                    assessed_student_ids = CompetencyAssessment.objects.filter(
+                        learning_outcome=assignment.learning_outcome
+                    ).values_list('student_id', flat=True)
+                    
+                    students = students.exclude(id__in=assessed_student_ids)
+            except Assignment.DoesNotExist:
+                pass
+
         from students.serializers import StudentSerializer
         serializer = StudentSerializer(students, many=True)
         return Response(serializer.data)
@@ -211,6 +229,32 @@ class CompetencyAssessmentViewSet(viewsets.ModelViewSet):
             return CompetencyAssessmentCreateSerializer
         return CompetencyAssessmentSerializer
     
+    def perform_create(self, serializer):
+        """Override to update the linked assignment submission status and set teacher"""
+        # Automatically set teacher if not provided
+        if 'teacher' not in serializer.validated_data and hasattr(self.request.user, 'teacher'):
+            instance = serializer.save(teacher=self.request.user.teacher)
+        else:
+            instance = serializer.save()
+        if instance.assignment_submission:
+            submission = instance.assignment_submission
+            # Ensure status is exactly 'graded' (matching frontend checks)
+            submission.status = 'graded'
+            
+            # Sync competency level to submission for easier frontend lookup
+            # The field exists in AssignmentSubmission model
+            submission.competency_level = instance.competency_level
+            submission.competency_comment = instance.teacher_comment
+            
+            submission.save()
+            
+            # Also update the parent assignment status if all students are graded
+            # (Optional but good for data integrity)
+            assignment = submission.assignment
+            if assignment.status != 'Graded':
+                assignment.status = 'Graded'
+                assignment.save()
+    
     def get_queryset(self):
         queryset = super().get_queryset()
         student_id = self.request.query_params.get('student')
@@ -241,23 +285,31 @@ class CompetencyAssessmentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='summary/(?P<student_id>[^/.]+)')
     def summary(self, request, student_id=None):
         """
-        Get competency summary for a student
-        GET /api/cbc/competency-assessments/summary/{student_id}/
-        
-        Returns count of each competency level
+        Get competency summary for a student using refined logic
+        Includes both direct assessments and quiz results mapped to outcomes.
+        Counts achieved outcomes, not just assessments.
         """
-        from django.db.models import Count
+        from .report_generator import generate_student_report
         
-        assessments = self.queryset.filter(student_id=student_id)
-        summary = assessments.values('competency_level').annotate(
-            count=Count('id')
-        ).order_by('competency_level')
-        
-        # Format response
-        result = {
-            'student_id': student_id,
-            'total_assessments': assessments.count(),
-            'by_level': {item['competency_level']: item['count'] for item in summary}
-        }
-        
-        return Response(result)
+        try:
+            report_data = generate_student_report(student_id)
+            stats = report_data.get('overall_stats', {})
+            breakdown = stats.get('breakdown', {})
+            
+            # Ensure all levels are present even if 0
+            by_level = {
+                'EE': breakdown.get('EE', 0),
+                'ME': breakdown.get('ME', 0),
+                'AE': breakdown.get('AE', 0),
+                'BE': breakdown.get('BE', 0)
+            }
+            
+            result = {
+                'student_id': student_id,
+                'total_assessments': stats.get('total_assessments', 0),
+                'by_level': by_level
+            }
+            
+            return Response(result)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

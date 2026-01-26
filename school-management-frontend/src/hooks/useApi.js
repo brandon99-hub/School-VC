@@ -26,6 +26,8 @@ export const useApi = () => {
         get: (url, config) => request('get', url, null, config),
         post: (url, data, config) => request('post', url, data, config),
         put: (url, data, config) => request('put', url, data, config),
+        patch: (url, data, config) => request('patch', url, data, config),
         delete: (url, config) => request('delete', url, null, config),
+        del: (url, config) => request('delete', url, null, config),
     }), [request]);
 };
