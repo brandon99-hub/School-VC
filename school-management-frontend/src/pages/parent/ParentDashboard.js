@@ -69,6 +69,14 @@ const ParentDashboard = () => {
     const daysInMonth = useMemo(() => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
+
+        // Helper to formatting date as YYYY-MM-DD using local time
+        const formatLocal = (y, m, d) => {
+            const mm = String(m + 1).padStart(2, '0');
+            const dd = String(d).padStart(2, '0');
+            return `${y}-${mm}-${dd}`;
+        };
+
         const firstDay = new Date(year, month, 1).getDay();
         const days = new Date(year, month + 1, 0).getDate();
 
@@ -79,7 +87,7 @@ const ParentDashboard = () => {
         for (let i = 1; i <= days; i++) {
             calendarDays.push({
                 day: i,
-                fullDate: new Date(year, month, i).toISOString().split('T')[0]
+                fullDate: formatLocal(year, month, i)
             });
         }
         return calendarDays;
@@ -96,9 +104,10 @@ const ParentDashboard = () => {
 
         allEvents.forEach(ev => {
             if (ev.due_date) {
-                const date = new Date(ev.due_date).toISOString().split('T')[0];
-                if (!dates[date]) dates[date] = [];
-                dates[date].push(ev);
+                // Parse due date strings robustly using string split
+                const datePart = ev.due_date.split('T')[0];
+                if (!dates[datePart]) dates[datePart] = [];
+                dates[datePart].push(ev);
             }
         });
         return dates;
@@ -153,20 +162,18 @@ const ParentDashboard = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
 
-            <main className="max-w-7xl mx-auto w-full px-6 py-10 flex-1">
-                <div className="mb-12 flex flex-col sm:flex-row items-center justify-between gap-6">
-                    <div className="text-center sm:text-left">
-                        <h1 className="text-4xl font-black text-[#18216D] tracking-tight">Parent Dashboard</h1>
-                        <p className="text-slate-500 mt-2 font-medium tracking-tight">Monitor scholar progress and manage school administration details</p>
+            <main className="max-w-7xl mx-auto w-full px-6 py-10 flex-1 space-y-10">
+                {/* Redesigned Header */}
+                <header className="relative overflow-hidden bg-[#18216D] rounded-[2.5rem] p-12 text-white shadow-2xl shadow-indigo-900/20">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFC425]/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#FFC425] mb-2">Parent Portal</p>
+                            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter">Welcome back, {parent?.first_name || 'Guardian'}</h1>
+                            <div className="h-2 w-24 bg-[#FFC425] rounded-full mt-6"></div>
+                        </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="px-6 py-3 bg-white text-slate-400 hover:text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-100 shadow-sm flex items-center gap-2"
-                    >
-                        <i className="fas fa-sign-out-alt"></i>
-                        Secure Logout
-                    </button>
-                </div>
+                </header>
 
                 <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div className="space-y-4">
@@ -248,6 +255,12 @@ const ParentDashboard = () => {
                                         <h4 className="text-5xl font-black text-[#18216D] tracking-tighter">
                                             KES {childFinances?.summary?.balance?.toLocaleString() || '0'}
                                         </h4>
+                                        {childFinances?.summary?.credit_balance > 0 && (
+                                            <div className="mt-4 flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl w-fit border border-emerald-100">
+                                                <i className="fas fa-wallet text-[10px]"></i>
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Credit Wallet: KES {childFinances.summary.credit_balance.toLocaleString()}</span>
+                                            </div>
+                                        )}
                                         <div className="mt-6 flex items-center gap-4">
                                             <button
                                                 onClick={() => navigate(`/parent/child/${selectedChild.id}/finances`)}
@@ -268,7 +281,7 @@ const ParentDashboard = () => {
                                         <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100/50">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                                Framework Components
+                                                {childFinances.fee_frameworks[0].academic_term_name} — {childFinances.fee_frameworks[0].academic_year_name}
                                             </p>
                                             <div className="space-y-3">
                                                 {[
@@ -352,7 +365,11 @@ const ParentDashboard = () => {
                                     ))}
                                     {daysInMonth.map((dateObj, idx) => {
                                         const hasEvents = dateObj.fullDate && eventDates[dateObj.fullDate];
-                                        const isToday = dateObj.fullDate === new Date().toISOString().split('T')[0];
+
+                                        // Robust check for today in local time
+                                        const today = new Date();
+                                        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                                        const isToday = dateObj.fullDate === todayStr;
 
                                         return (
                                             <div key={idx} className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all ${dateObj.day ? 'hover:bg-slate-50 cursor-pointer group' : ''} ${isToday ? 'bg-[#18216D] text-white shadow-xl shadow-indigo-900/20 scale-105 z-10' : 'text-[#18216D]'}`}>
@@ -412,7 +429,7 @@ const ParentDashboard = () => {
                                         [
                                             ...(childActivities.assignments || []).map(a => ({ ...a, type: 'Assignment' })),
                                             ...(childActivities.quizzes || []).map(q => ({ ...q, type: 'Quiz' }))
-                                        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 7).map((item, idx) => (
+                                        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10).map((item, idx) => (
                                             <div key={idx} className="flex gap-4 items-start p-4 hover:bg-slate-50 transition-all rounded-2xl group/act">
                                                 <div className={`mt-1 h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all group-hover/act:scale-110 shadow-sm ${item.type === 'Quiz' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
                                                     {item.type === 'Quiz' ? <AcademicCapIcon className="w-6 h-6" /> : <ChartBarIcon className="w-6 h-6" />}
@@ -428,7 +445,14 @@ const ParentDashboard = () => {
                                                     <h4 className="font-bold text-[#18216D] text-sm truncate leading-tight">
                                                         {item.title}
                                                     </h4>
-                                                    {item.is_completed && <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-1">Status: Completed</p>}
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        {item.learning_area_name && (
+                                                            <span className="text-[8px] font-black text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                                                {item.learning_area_name}
+                                                            </span>
+                                                        )}
+                                                        {item.is_completed && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Status: Completed</span>}
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))

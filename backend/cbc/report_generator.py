@@ -210,7 +210,7 @@ class CBCReportGenerator:
                 'name': area.name,
                 'code': area.code,
                 'strands': strands_data,
-                'total_assessments': len(area_lvls),
+                'total_assessments': len(area_final_levels),
                 'breakdown': area_breakdown
             })
         

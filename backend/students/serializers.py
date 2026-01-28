@@ -15,7 +15,7 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'name', 'first_name', 'last_name', 
             'student_id', 'date_of_birth', 'gender', 'grade', 
-            'grade_level', 'grade_level_name', 'address', 'phone'
+            'grade_level', 'grade_level_name', 'address', 'phone', 'credit_balance'
         ]
 
     def get_name(self, obj):

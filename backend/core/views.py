@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Announcement, Notification, AcademicYear  # No TeacherProfile or StudentProfile here
+from .models import Announcement, Notification, AcademicYear, AcademicTerm
 from students.models import Student, Parent
 from teachers.models import Teacher
 from courses.models import Course
@@ -19,7 +19,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .permissions import IsAdmin
 from .serializers import UserSerializer, TeacherSerializer, AnnouncementSerializer, NotificationSerializer, \
-    StudentSerializer, UserRegistrationSerializer, DynamicUserRegistrationSerializer  # Updated serializer names
+    StudentSerializer, UserRegistrationSerializer, DynamicUserRegistrationSerializer, \
+    AcademicYearSerializer, AcademicTermSerializer
 from .utils import get_user_role
 from rest_framework import generics
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -536,7 +537,19 @@ def admin_update_user(request, user_id):
             student.phone = request.data.get('phone', student.phone)
             student.address = request.data.get('address', student.address)
             if role == 'student':
-                student.grade = request.data.get('grade', student.grade)
+                grade_str = request.data.get('grade')
+                if grade_str is not None:
+                    student.grade = grade_str
+                    # Update grade_level ForeignKey robustly
+                    import re
+                    from cbc.models import GradeLevel
+                    match = re.search(r'(\d+)', str(grade_str))
+                    grade_level = None
+                    if match:
+                        grade_level = GradeLevel.objects.filter(name=f"Grade {match.group(1)}").first()
+                    if not grade_level:
+                        grade_level = GradeLevel.objects.filter(name__icontains=grade_str).first()
+                    student.grade_level = grade_level
             student.save()
             return Response({'message': f'{role.capitalize()} updated successfully'})
             
@@ -565,3 +578,34 @@ def admin_update_user(request, user_id):
         return Response({'error': str(e)}, status=400)
     
     return Response({'error': 'Invalid role'}, status=400)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def active_term(request):
+    """Detect current active term based on date"""
+    current_year = AcademicYear.objects.filter(is_current=True).first()
+    if not current_year:
+        return Response({'detail': 'No current academic year defined'}, status=404)
+    
+    term = current_year.get_active_term()
+    if not term:
+        return Response({
+            'year': AcademicYearSerializer(current_year).data,
+            'term': None,
+            'detail': 'Between terms'
+        })
+    
+    return Response({
+        'year': AcademicYearSerializer(current_year).data,
+        'term': AcademicTermSerializer(term).data
+    })
+
+class AcademicYearViewSet(viewsets.ModelViewSet):
+    queryset = AcademicYear.objects.all()
+    serializer_class = AcademicYearSerializer
+    permission_classes = [IsAuthenticated]
+
+class AcademicTermViewSet(viewsets.ModelViewSet):
+    queryset = AcademicTerm.objects.all()
+    serializer_class = AcademicTermSerializer
+    permission_classes = [IsAuthenticated]

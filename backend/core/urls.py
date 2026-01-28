@@ -12,7 +12,9 @@ from .views import (
     UserView,
     ProfileView,
     CSRFTokenView,
-    LogoutView
+    LogoutView,
+    AcademicYearViewSet,
+    AcademicTermViewSet
 )
 from courses.views import CourseViewSet, GradeViewSet, AssignmentViewSet, AssignmentSubmissionViewSet
 from students.views import enroll_course
@@ -25,6 +27,8 @@ router.register(r'assignment-submissions', AssignmentSubmissionViewSet)
 router.register(r'grades', GradeViewSet)
 router.register(r'teachers', views.TeacherViewSet)
 router.register(r'announcements', views.AnnouncementViewSet)
+router.register(r'academic-years', views.AcademicYearViewSet)
+router.register(r'academic-terms', views.AcademicTermViewSet)
 
 app_name = 'core'
 
@@ -52,6 +56,7 @@ urlpatterns = [
             path('profile/', ProfileView.as_view(), name='profile_api'),
             path('csrf/', CSRFTokenView.as_view(), name='csrf_token'),
             path('logout/', LogoutView.as_view(), name='logout'),
+            path('active-term/', views.active_term, name='active_term'),
             path('enroll/', enroll_course, name='enroll_course'),# Added
         ])),
 

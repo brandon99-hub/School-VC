@@ -1,20 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
-import SchoolFinancialLedger from '../../components/admin/SchoolFinancialLedger';
+import { useAppState } from '../../context/AppStateContext';
+import Modal from '../../components/common/Modal';
 
 const FeeManagement = () => {
     const navigate = useNavigate();
     const { get, post, put, del } = useApi();
+    const { showToast } = useAppState();
     const [feeStructures, setFeeStructures] = useState([]);
     const [gradeLevels, setGradeLevels] = useState([]);
+    const [academicTerms, setAcademicTerms] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [editingFee, setEditingFee] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [feeToDelete, setFeeToDelete] = useState(null);
     const [formData, setFormData] = useState({
         grade_level: '',
-        term: '1',
-        academic_year: '2024/2025',
+        academic_term: '',
         tuition_amount: '',
         books_amount: '',
         activities_amount: '',
@@ -27,12 +31,14 @@ const FeeManagement = () => {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const [feesData, gradesData] = await Promise.all([
+            const [feesData, gradesData, termsData] = await Promise.all([
                 get('/api/finance/fee-structures/'),
-                get('/api/cbc/grade-levels/')
+                get('/api/cbc/grade-levels/'),
+                get('/api/academic-terms/')
             ]);
             setFeeStructures(feesData || []);
             setGradeLevels(gradesData || []);
+            setAcademicTerms(termsData || []);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -54,9 +60,10 @@ const FeeManagement = () => {
             }
             fetchData();
             resetForm();
+            showToast(`Fee structure ${editingFee ? 'updated' : 'created'} successfully`, 'success');
         } catch (error) {
             console.error('Error saving fee structure:', error);
-            alert('Failed to save fee structure');
+            showToast('Failed to save fee structure', 'error');
         }
     };
 
@@ -64,8 +71,7 @@ const FeeManagement = () => {
         setEditingFee(fee);
         setFormData({
             grade_level: fee.grade_level,
-            term: fee.term,
-            academic_year: fee.academic_year,
+            academic_term: fee.academic_term,
             tuition_amount: fee.tuition_amount,
             books_amount: fee.books_amount,
             activities_amount: fee.activities_amount,
@@ -77,22 +83,30 @@ const FeeManagement = () => {
         setShowForm(true);
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this fee structure?')) return;
+    const handleDelete = (id) => {
+        setFeeToDelete(id);
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!feeToDelete) return;
         try {
-            await del(`/api/finance/fee-structures/${id}/`);
+            await del(`/api/finance/fee-structures/${feeToDelete}/`);
             fetchData();
+            showToast('Framework successfully evicted from system registry', 'success');
         } catch (error) {
             console.error('Error deleting fee structure:', error);
-            alert('Failed to delete fee structure');
+            showToast('Failed to evict framework', 'error');
+        } finally {
+            setDeleteModalOpen(false);
+            setFeeToDelete(null);
         }
     };
 
     const resetForm = () => {
         setFormData({
             grade_level: '',
-            term: '1',
-            academic_year: '2024/2025',
+            academic_term: '',
             tuition_amount: '',
             books_amount: '',
             activities_amount: '',
@@ -111,6 +125,16 @@ const FeeManagement = () => {
             currency: 'KES',
             minimumFractionDigits: 0
         }).format(amount);
+    };
+
+    const handleKeyDown = (e, nextFieldId) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextInput = document.getElementById(nextFieldId);
+            if (nextInput) {
+                nextInput.focus();
+            }
+        }
     };
 
     return (
@@ -176,29 +200,21 @@ const FeeManagement = () => {
                                     ))}
                                 </select>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Billing Term</label>
+                            <div className="md:col-span-2 space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Academic Term</label>
                                 <select
-                                    value={formData.term}
-                                    onChange={(e) => setFormData({ ...formData, term: e.target.value })}
+                                    value={formData.academic_term}
+                                    onChange={(e) => setFormData({ ...formData, academic_term: e.target.value })}
                                     required
                                     className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-[#18216D] font-bold text-sm transition-all"
                                 >
-                                    <option value="1">Term 1 (Lent)</option>
-                                    <option value="2">Term 2 (Trinity)</option>
-                                    <option value="3">Term 3 (Advent)</option>
+                                    <option value="">Select Target Term (Academic Year)</option>
+                                    {academicTerms.map(term => (
+                                        <option key={term.id} value={term.id}>
+                                            {term.name} — {academicTerms.find(t => t.id === term.id)?.year_name || ''}
+                                        </option>
+                                    ))}
                                 </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Academic Year</label>
-                                <input
-                                    type="text"
-                                    value={formData.academic_year}
-                                    onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                                    placeholder="2024/2025"
-                                    required
-                                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-[#18216D] font-bold text-sm transition-all"
-                                />
                             </div>
                         </div>
 
@@ -206,21 +222,23 @@ const FeeManagement = () => {
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {[
-                                { id: 'tuition_amount', label: 'Tuition Fee' },
-                                { id: 'books_amount', label: 'Learning Material' },
-                                { id: 'activities_amount', label: 'Co-Curricular' },
-                                { id: 'transport_amount', label: 'Transport / Bus' },
-                                { id: 'boarding_amount', label: 'Accommodation' },
-                                { id: 'other_amount', label: 'Miscellaneous' }
+                                { id: 'tuition_amount', label: 'Tuition Fee', next: 'books_amount' },
+                                { id: 'books_amount', label: 'Learning Material', next: 'activities_amount' },
+                                { id: 'activities_amount', label: 'Co-Curricular', next: 'transport_amount' },
+                                { id: 'transport_amount', label: 'Transport / Bus', next: 'boarding_amount' },
+                                { id: 'boarding_amount', label: 'Accommodation', next: 'other_amount' },
+                                { id: 'other_amount', label: 'Miscellaneous', next: 'submit_btn' }
                             ].map((field) => (
                                 <div key={field.id} className="space-y-2 group">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block group-focus-within:text-[#18216D] transition-colors">{field.label}</label>
                                     <div className="relative">
                                         <span className="absolute left-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300">KES</span>
                                         <input
+                                            id={field.id}
                                             type="number"
                                             value={formData[field.id]}
                                             onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
+                                            onKeyDown={(e) => handleKeyDown(e, field.next)}
                                             required={field.id === 'tuition_amount'}
                                             min="0"
                                             step="0.01"
@@ -247,6 +265,7 @@ const FeeManagement = () => {
                         <div className="flex gap-4 pt-4">
                             <button
                                 type="submit"
+                                id="submit_btn"
                                 className="px-12 py-4 bg-[#18216D] text-white rounded-2xl shadow-xl shadow-indigo-900/20 font-black text-[10px] uppercase tracking-[0.2em] hover:scale-[1.02] transition-all"
                             >
                                 {editingFee ? 'Save Framework' : 'Publish Framework'}
@@ -298,7 +317,7 @@ const FeeManagement = () => {
                                         <tr key={fee.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-6 py-6">
                                                 <div className="font-black text-[#18216D] text-sm">{fee.grade_level_name}</div>
-                                                <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">Term {fee.term} — {fee.academic_year}</div>
+                                                <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{fee.academic_term_name} — {fee.academic_year_name}</div>
                                             </td>
                                             <td className="px-6 py-6 text-sm font-bold text-gray-700">{formatCurrency(fee.tuition_amount)}</td>
                                             <td className="px-6 py-6 font-medium text-slate-400">
@@ -333,11 +352,32 @@ const FeeManagement = () => {
                         </div>
                     )}
                 </div>
-                {/* Master Financial Ledger */}
-                <div className="pt-10 border-t border-slate-100">
-                    <SchoolFinancialLedger />
-                </div>
             </div>
+            {/* Deletion Confirmation Modal */}
+            <Modal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                title="Eviction Warning"
+                type="danger"
+                footer={
+                    <>
+                        <button
+                            onClick={confirmDelete}
+                            className="w-full sm:w-auto px-10 py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-rose-900/20 hover:scale-[1.02] active:scale-95 transition-all"
+                        >
+                            Confirm Eviction
+                        </button>
+                        <button
+                            onClick={() => setDeleteModalOpen(false)}
+                            className="w-full sm:w-auto px-10 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-200 transition-all font-mono"
+                        >
+                            Cancel
+                        </button>
+                    </>
+                }
+            >
+                You are about to permanently remove this **Fee Framework** from the active ledger. This action cannot be undone and may affect billing processes.
+            </Modal>
         </div>
     );
 };

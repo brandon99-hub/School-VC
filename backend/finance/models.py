@@ -12,15 +12,8 @@ class FeeStructure(models.Model):
     """
     Fee structure template for a grade level and term
     """
-    TERM_CHOICES = [
-        ('1', 'Term 1'),
-        ('2', 'Term 2'),
-        ('3', 'Term 3'),
-    ]
-    
     grade_level = models.ForeignKey(GradeLevel, on_delete=models.CASCADE, related_name='fee_structures')
-    term = models.CharField(max_length=1, choices=TERM_CHOICES)
-    academic_year = models.CharField(max_length=9, help_text="e.g., 2024/2025")
+    academic_term = models.ForeignKey('core.AcademicTerm', on_delete=models.CASCADE, related_name='fee_structures', null=True)
     
     # Fee components
     tuition_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
@@ -37,8 +30,8 @@ class FeeStructure(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ['grade_level', 'term', 'academic_year']
-        ordering = ['-academic_year', '-term']
+        unique_together = ['grade_level', 'academic_term']
+        ordering = ['-academic_term__start_date']
     
     def save(self, *args, **kwargs):
         # Auto-calculate total
@@ -49,7 +42,7 @@ class FeeStructure(models.Model):
         super().save(*args, **kwargs)
     
     def __str__(self):
-        return f"{self.grade_level.name} - Term {self.term} ({self.academic_year})"
+        return f"{self.grade_level.name} - {self.academic_term}"
 
 
 class StudentFee(models.Model):

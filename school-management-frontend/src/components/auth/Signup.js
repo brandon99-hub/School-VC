@@ -221,7 +221,7 @@ const Signup = () => {
                                                 className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm font-bold text-[#18216D] appearance-none cursor-pointer"
                                             >
                                                 <option value="">Select Grade</option>
-                                                {[...Array(10)].map((_, i) => (
+                                                {[...Array(12)].map((_, i) => (
                                                     <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>
                                                 ))}
                                             </select>

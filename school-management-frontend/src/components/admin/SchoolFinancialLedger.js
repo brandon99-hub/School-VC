@@ -16,6 +16,8 @@ const SchoolFinancialLedger = () => {
     const [gradeFilter, setGradeFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState(''); // 'cleared', 'outstanding', 'partial'
     const [sortConfig, setSortConfig] = useState({ key: 'student_name', direction: 'asc' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const fetchLedgerData = useCallback(async () => {
         try {
@@ -69,7 +71,20 @@ const SchoolFinancialLedger = () => {
         }
 
         return result;
+        setCurrentPage(1); // Reset to first page on filter change
+        return result;
     }, [ledgers, searchTerm, gradeFilter, statusFilter, sortConfig]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, gradeFilter, statusFilter, sortConfig]);
+
+    // Pagination Logic
+    const totalPages = Math.ceil(sortedAndFilteredLedgers.length / itemsPerPage);
+    const paginatedLedgers = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return sortedAndFilteredLedgers.slice(startIndex, startIndex + itemsPerPage);
+    }, [sortedAndFilteredLedgers, currentPage]);
 
     const requestSort = (key) => {
         let direction = 'asc';
@@ -108,11 +123,21 @@ const SchoolFinancialLedger = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-xl font-black text-[#18216D] tracking-tight italic">School-Wide Financial Ledger</h2>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Institutional Student Account Overview</p>
+                <div className="flex items-center gap-6">
+                    <div>
+                        <h2 className="text-xl font-black text-[#18216D] tracking-tight italic">Student Accounts</h2>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Institutional Revenue Control</p>
+                    </div>
+                    <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-emerald-50 rounded-2xl border border-emerald-100">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest leading-none">M-Pesa Gateway Live Sync</span>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <div className="text-right mr-4 hidden md:block">
+                        <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Last Statement Pull</p>
+                        <p className="text-[10px] font-bold text-slate-500">Just now</p>
+                    </div>
                     <button className="p-2.5 text-slate-400 hover:text-[#18216D] transition-colors"><PrinterIcon className="w-5 h-5" /></button>
                     <button className="p-2.5 text-slate-400 hover:text-[#18216D] transition-colors"><ArrowDownTrayIcon className="w-5 h-5" /></button>
                 </div>
@@ -175,7 +200,7 @@ const SchoolFinancialLedger = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {sortedAndFilteredLedgers.map((item) => (
+                            {paginatedLedgers.map((item) => (
                                 <tr key={item.id} className="hover:bg-indigo-50/30 transition-all group">
                                     <td className="px-8 py-5">
                                         <div>
@@ -203,6 +228,30 @@ const SchoolFinancialLedger = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {paginatedLedgers.length > 0 && (
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-6 px-6 pb-6 bg-slate-50/50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, sortedAndFilteredLedgers.length)} of {sortedAndFilteredLedgers.length} records
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-[#18216D] disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-[#18216D] disabled:opacity-50 hover:bg-slate-50 transition-colors"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {sortedAndFilteredLedgers.length === 0 && (
                     <div className="py-20 text-center">

@@ -19,6 +19,7 @@ import {
     ListBulletIcon,
     ChevronDownIcon
 } from '@heroicons/react/24/outline';
+import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 import QuizBuilder from '../../components/teacher/QuizBuilder';
 import GradeBook from '../../components/teacher/GradeBook';
 import DiscussionManager from '../../components/teacher/DiscussionManager';
@@ -110,17 +111,13 @@ const TeacherCourseView = () => {
     const fetchCourseData = useCallback(async () => {
         try {
             setLoading(true);
-            // Fetch Course details (linked to Registry)
             const courseResponse = await get(`/teachers/api/courses/${id}/`);
             setCourse(courseResponse);
 
-            // Map modules to strands and flatten to sub-strands (lessons)
             const allModules = courseResponse.modules || [];
             const allLessons = allModules.flatMap(m => m.sub_strands || []);
             setLessons(allLessons);
 
-            // Fetch Quizzes (using fallback-capable endpoint)
-            // Use any lesson ID or just the first one to get Learning Area quizzes
             if (allLessons.length > 0) {
                 const quizzesResponse = await get(`/teachers/api/lessons/${allLessons[0].id}/quizzes/`);
                 setQuizzes(quizzesResponse || []);
@@ -147,7 +144,6 @@ const TeacherCourseView = () => {
         setShowQuizBuilder(true);
     };
 
-
     const handleEditQuiz = (quiz) => {
         setEditingQuiz(quiz);
         setSelectedLessonForQuiz(quiz.lesson);
@@ -170,7 +166,6 @@ const TeacherCourseView = () => {
             showToast('Failed to delete quiz', 'error');
         }
     };
-
 
     if (loading) {
         return (
@@ -198,7 +193,6 @@ const TeacherCourseView = () => {
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
-            {/* Sidebar */}
             <Sidebar
                 activeTab={activeTab}
                 onChange={(tab) => {
@@ -208,9 +202,7 @@ const TeacherCourseView = () => {
                 collapsed={isSidebarCollapsed}
             />
 
-            {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Premium Header */}
                 <header className="bg-white border-b border-gray-100 z-10">
                     <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center space-x-4">
@@ -258,7 +250,6 @@ const TeacherCourseView = () => {
                     </div>
                 </header>
 
-                {/* Content Area */}
                 <main className="flex-1 overflow-y-auto p-8 relative">
                     <div className="max-w-6xl mx-auto">
                         {activeTab === 'content' && (
@@ -333,9 +324,6 @@ const TeacherCourseView = () => {
                                                                     <span className="px-2.5 py-1 text-[10px] font-black bg-gray-50 text-gray-500 rounded-full border border-gray-100 uppercase tracking-widest">Draft</span>
                                                                 )}
                                                             </div>
-                                                            <p className="text-xs font-black text-[#18216D] uppercase tracking-widest mt-1">
-                                                                {quiz.lesson ? `Unit: ${lessons.find(l => l.id === quiz.lesson)?.title || 'Unknown'}` : 'Subject Assessment (CBC)'}
-                                                            </p>
 
                                                             {quiz.tested_outcomes_detail?.length > 0 && (
                                                                 <div className="mt-4">
@@ -374,6 +362,12 @@ const TeacherCourseView = () => {
                                                     <div className="flex items-center space-x-6 text-xs font-black text-gray-400 mt-auto uppercase tracking-wider">
                                                         <span className="flex items-center"><ClockIcon className="w-4 h-4 mr-2" /> {quiz.time_limit_minutes > 0 ? `${quiz.time_limit_minutes} Mins` : 'Unlimited'}</span>
                                                         <span className="flex items-center"><ClipboardDocumentCheckIcon className="w-4 h-4 mr-2" /> {quiz.questions?.length || 0} Questions</span>
+                                                        {quiz.due_date && (
+                                                            <span className="flex items-center text-[#18216D]">
+                                                                <i className="fas fa-calendar-alt mr-2"></i>
+                                                                Due: {new Date(quiz.due_date).toLocaleDateString()}
+                                                            </span>
+                                                        )}
                                                     </div>
 
                                                     <div className="mt-6 flex items-center space-x-3">
@@ -396,91 +390,95 @@ const TeacherCourseView = () => {
                                     </div>
                                 ) : (
                                     <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-indigo-900/5 overflow-hidden animate-in fade-in duration-500">
-                                        <table className="w-full">
-                                            <thead>
-                                                <tr className="bg-slate-50 border-b border-slate-100">
-                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Quiz Details</th>
-                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Deployment Unit</th>
-                                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Outcomes</th>
-                                                    <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Questions</th>
-                                                    <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Duration</th>
-                                                    <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50">
-                                                {quizzes.map((quiz) => (
-                                                    <tr key={quiz.id} className="hover:bg-indigo-50/30 transition-all group">
-                                                        <td className="px-8 py-6">
-                                                            <div className="flex items-center gap-3">
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-base font-black text-[#18216D] tracking-tight">{quiz.title}</span>
-                                                                        {quiz.is_published && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-sm shadow-emerald-200" />}
-                                                                        {!quiz.is_published && <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic ml-1">(Draft)</span>}
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="bg-slate-50 border-b border-slate-100">
+                                                        <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Quiz Details</th>
+                                                        <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Due Date</th>
+                                                        <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Outcomes</th>
+                                                        <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Questions</th>
+                                                        <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Duration</th>
+                                                        <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {quizzes.map((quiz) => (
+                                                        <tr key={quiz.id} className="hover:bg-indigo-50/30 transition-all group">
+                                                            <td className="px-8 py-6">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-base font-black text-[#18216D] tracking-tight">{quiz.title}</span>
+                                                                            {quiz.is_published && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-sm shadow-emerald-200" />}
+                                                                            {!quiz.is_published && <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic ml-1">(Draft)</span>}
+                                                                        </div>
+                                                                        {quiz.due_date && (
+                                                                            <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                                                                                Due: {new Date(quiz.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
-                                                                    {quiz.due_date && (
-                                                                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">
-                                                                            Due: {new Date(quiz.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                                        </p>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-8 py-6">
+                                                                {quiz.due_date ? (
+                                                                    <span className="text-xs font-black text-[#18216D]">
+                                                                        {new Date(quiz.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">No Deadline</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-8 py-6">
+                                                                <div className="flex flex-col gap-2 max-w-[300px]">
+                                                                    {quiz.tested_outcomes_detail?.length > 0 ? (
+                                                                        quiz.tested_outcomes_detail.map((o, i) => (
+                                                                            <div key={i} className="flex items-start gap-2">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-[#FFC425] mt-1.5 shrink-0"></div>
+                                                                                <span className="text-[10px] font-bold text-[#18216D] leading-tight italic" title={o.description}>
+                                                                                    {o.description}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="text-[10px] font-bold text-slate-300 italic uppercase tracking-widest">No specific outcomes</span>
                                                                     )}
                                                                 </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6">
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-[10px] font-black text-[#18216D] uppercase tracking-widest px-2.5 py-1 bg-indigo-50 rounded-lg border border-indigo-100/50 w-fit">
-                                                                    {quiz.lesson ? lessons.find(l => l.id === quiz.lesson)?.title || 'Unknown' : 'General Assessment'}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6">
-                                                            <div className="flex flex-col gap-2 max-w-[300px]">
-                                                                {quiz.tested_outcomes_detail?.length > 0 ? (
-                                                                    quiz.tested_outcomes_detail.map((o, i) => (
-                                                                        <div key={i} className="flex items-start gap-2">
-                                                                            <div className="w-1.5 h-1.5 rounded-full bg-[#FFC425] mt-1.5 shrink-0"></div>
-                                                                            <span className="text-[10px] font-bold text-[#18216D] leading-tight italic" title={o.description}>
-                                                                                {o.description}
-                                                                            </span>
-                                                                        </div>
-                                                                    ))
-                                                                ) : (
-                                                                    <span className="text-[10px] font-bold text-slate-300 italic uppercase tracking-widest">No specific outcomes</span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6">
-                                                            <div className="flex flex-col items-center">
-                                                                <p className="text-sm font-black text-[#18216D]">{quiz.questions?.length || 0}</p>
-                                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Questions</p>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6">
-                                                            <div className="flex flex-col items-center">
-                                                                <p className="text-sm font-black text-[#18216D]">{quiz.time_limit_minutes || '0'}</p>
-                                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Minutes</p>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6 text-right">
-                                                            <div className="flex items-center justify-end gap-2">
-                                                                <button
-                                                                    onClick={() => handleEditQuiz(quiz)}
-                                                                    className="p-2.5 text-slate-300 hover:text-[#18216D] hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md border border-transparent hover:border-slate-100"
-                                                                >
-                                                                    <PencilSquareIcon className="w-4 h-4" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteQuiz(quiz.id)}
-                                                                    className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
-                                                                >
-                                                                    <TrashIcon className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                            </td>
+                                                            <td className="px-8 py-6">
+                                                                <div className="flex flex-col items-center">
+                                                                    <p className="text-sm font-black text-[#18216D]">{quiz.questions?.length || 0}</p>
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Questions</p>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-8 py-6">
+                                                                <div className="flex flex-col items-center">
+                                                                    <p className="text-sm font-black text-[#18216D]">{quiz.time_limit_minutes || '0'}</p>
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Minutes</p>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-8 py-6 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <button
+                                                                        onClick={() => handleEditQuiz(quiz)}
+                                                                        className="p-2.5 text-slate-300 hover:text-[#18216D] hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md border border-transparent hover:border-slate-100"
+                                                                    >
+                                                                        <PencilSquareIcon className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteQuiz(quiz.id)}
+                                                                        className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
+                                                                    >
+                                                                        <TrashIcon className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -158,7 +158,7 @@ const UserEditModal = ({ user, isOpen, onClose, onRefresh }) => {
                                         className="w-full px-5 py-3.5 bg-white border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 text-sm font-bold shadow-sm appearance-none cursor-pointer"
                                     >
                                         <option value="">Select Grade</option>
-                                        {[...Array(10)].map((_, i) => (
+                                        {[...Array(12)].map((_, i) => (
                                             <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>
                                         ))}
                                     </select>

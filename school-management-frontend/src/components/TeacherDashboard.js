@@ -14,8 +14,11 @@ import {
     CheckCircleIcon
 } from '@heroicons/react/24/outline';
 
-const StatCard = ({ label, value, icon: Icon, badge }) => (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex items-center gap-5 hover:shadow-md transition-shadow">
+const StatCard = ({ label, value, icon: Icon, badge, onClick }) => (
+    <div
+        onClick={onClick}
+        className={`bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex items-center gap-5 hover:shadow-md transition-all ${onClick ? 'cursor-pointer hover:scale-[1.02] hover:border-indigo-100' : ''}`}
+    >
         <div className="h-14 w-14 rounded-2xl bg-[#18216D]/5 text-[#18216D] flex items-center justify-center">
             <Icon className="h-7 w-7" />
         </div>
@@ -27,17 +30,140 @@ const StatCard = ({ label, value, icon: Icon, badge }) => (
     </div>
 );
 
+const SubmissionDetailModal = ({ courses, onClose }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Flatten assignments from all courses
+    const allAssignments = useMemo(() => {
+        return courses.flatMap(course =>
+            (course.assignments || []).map(asgn => ({
+                ...asgn,
+                courseName: course.name,
+                courseCode: course.code,
+                // Calculated fields for sorting
+                ungradedCount: (asgn.submission_count || 0) - (asgn.graded_submissions_count || 0)
+            }))
+        ).sort((a, b) => {
+            // Sort by ungraded count descending (highest priority)
+            if (b.ungradedCount !== a.ungradedCount) {
+                return b.ungradedCount - a.ungradedCount;
+            }
+            // Fallback to due date (most recent first)
+            return new Date(b.due_date) - new Date(a.due_date);
+        });
+    }, [courses]);
+
+    const filteredAssignments = useMemo(() => {
+        if (!searchTerm) return allAssignments;
+        const lowerTerm = searchTerm.toLowerCase();
+        return allAssignments.filter(a =>
+            a.title.toLowerCase().includes(lowerTerm) ||
+            a.courseName.toLowerCase().includes(lowerTerm) ||
+            a.courseCode.toLowerCase().includes(lowerTerm)
+        );
+    }, [allAssignments, searchTerm]);
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                <div className="p-8 border-b border-slate-100 flex items-center justify-between gap-6">
+                    <div>
+                        <h2 className="text-2xl font-black text-[#18216D] uppercase tracking-tight">Submission Overview</h2>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Global Assignment Tracking</p>
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="flex-1 max-w-md relative group">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#18216D] transition-colors">
+                            <i className="fas fa-search"></i>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search tasks or learning areas..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18216D]/20 focus:bg-white transition-all text-sm font-bold text-[#18216D]"
+                        />
+                    </div>
+
+                    <button onClick={onClose} className="h-10 w-10 rounded-full bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-500 flex items-center justify-center transition-all">
+                        <span className="sr-only">Close</span>
+                        <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto p-8 space-y-4 custom-scrollbar">
+                    {filteredAssignments.length > 0 ? (
+                        filteredAssignments.map(assignment => {
+                            const total = assignment.submission_count || 0;
+                            const graded = assignment.graded_submissions_count || 0;
+                            const percentage = total > 0 ? Math.round((graded / total) * 100) : 0;
+
+                            return (
+                                <div key={assignment.id} className="p-5 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-slate-50/50 transition-all group">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest border border-indigo-100">
+                                                {assignment.courseCode}
+                                            </span>
+                                            <h3 className="font-black text-[#18216D]">{assignment.title}</h3>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                            Due {new Date(assignment.due_date).toLocaleDateString()}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-6">
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between text-xs mb-1.5">
+                                                <span className="font-bold text-slate-500 uppercase tracking-wider">Grading Progress</span>
+                                                <span className="font-black text-[#18216D]">{graded} / {total} Submissions</span>
+                                            </div>
+                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-500 ${percentage === 100 ? 'bg-emerald-500' : 'bg-[#FFC425]'}`}
+                                                    style={{ width: `${percentage}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right min-w-[80px]">
+                                            <p className="text-2xl font-black text-[#18216D]">{total}</p>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Received</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="text-center py-20">
+                            <DocumentTextIcon className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No assignments found</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const TeacherDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const { courses, uniqueStudentCount, pendingActions, loading, error, refresh } = useAppState();
     const [selectedAssignment, setSelectedAssignment] = useState(null);
+    const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
 
     const fullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Guest' : 'Guest';
 
     const overview = useMemo(() => {
         const totalStudents = uniqueStudentCount || 0;
         const totalAssignments = courses.reduce((acc, course) => acc + (course.assignments?.length || 0), 0);
+
+        // Calculate total submissions across all assignments
+        const totalSubmissions = courses.reduce((acc, course) => {
+            return acc + (course.assignments?.reduce((a, asgn) => a + (asgn.submission_count || 0), 0) || 0);
+        }, 0);
+
         const gradedCount = courses.reduce((acc, course) => {
             return acc + (course.assignments?.reduce((a, asgn) => a + (asgn.graded_submissions_count || 0), 0) || 0);
         }, 0);
@@ -46,6 +172,7 @@ const TeacherDashboard = () => {
             learningAreas: courses.length,
             students: totalStudents,
             assignments: totalAssignments,
+            submissions: totalSubmissions,
             gradedAssignments: gradedCount
         };
     }, [courses, uniqueStudentCount]);
@@ -81,10 +208,11 @@ const TeacherDashboard = () => {
                     <StatCard label="Learning Areas" value={overview.learningAreas} icon={BookOpenIcon} />
                     <StatCard label="Total Students" value={overview.students} icon={UserGroupIcon} />
                     <StatCard
-                        label="Total Assignments"
-                        value={overview.assignments}
+                        label="Total Submissions"
+                        value={overview.submissions}
                         icon={ClipboardDocumentCheckIcon}
                         badge={`${overview.gradedAssignments} Graded`}
+                        onClick={() => setShowSubmissionsModal(true)}
                     />
                 </section>
 
@@ -240,6 +368,10 @@ const TeacherDashboard = () => {
                             <GradeForm assignmentId={selectedAssignment} onClose={() => setSelectedAssignment(null)} />
                         </div>
                     </div>
+                )}
+
+                {showSubmissionsModal && (
+                    <SubmissionDetailModal courses={courses} onClose={() => setShowSubmissionsModal(false)} />
                 )}
             </main>
         </div>

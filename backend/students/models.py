@@ -36,6 +36,7 @@ class Student(AbstractUser):
     # Legacy M2M kept for backwards compatibility. Active enrollment should
     # use Course.students -> Student.enrolled_courses reverse relation.
     courses = models.ManyToManyField('courses.Course', related_name='enrolled_students', blank=True)
+    credit_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Carried forward overpayments")
     date_joined = models.DateField(auto_now_add=True)
 
     USERNAME_FIELD = 'email'

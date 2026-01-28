@@ -289,13 +289,24 @@ class ParentViewSet(viewsets.ModelViewSet):
         fees = StudentFee.objects.filter(student=child)
         payments = Payment.objects.filter(student_fee__student=child)
         invoices = Invoice.objects.filter(student_fee__student=child)
-        
+        from core.models import AcademicYear
+        current_year = AcademicYear.objects.filter(is_current=True).first()
+        current_term = current_year.get_active_term() if current_year else None
+
         # Get the active fee structure/framework details
-        fee_structure_data = []
-        if fees.exists():
-            # Get structures for the child's grade level
-            structures = FeeStructure.objects.filter(grade_level=child.grade_level, is_active=True).order_by('-academic_year', '-term')
-            fee_structure_data = FeeStructureSerializer(structures, many=True).data
+        structures = FeeStructure.objects.filter(grade_level=child.grade_level, is_active=True)
+        
+        # Order them such that the current term is first, then by date descending
+        if current_term:
+            structures = sorted(
+                structures,
+                key=lambda x: (x.academic_term == current_term, x.academic_term.start_date if x.academic_term else None),
+                reverse=True
+            )
+        else:
+            structures = structures.order_by('-academic_term__start_date')
+            
+        fee_structure_data = FeeStructureSerializer(structures, many=True).data
 
         return Response({
             'fees': StudentFeeSerializer(fees, many=True).data,
@@ -305,7 +316,8 @@ class ParentViewSet(viewsets.ModelViewSet):
             'summary': {
                 'total_fees': sum(f.final_amount for f in fees),
                 'total_paid': sum(f.amount_paid for f in fees),
-                'balance': sum(f.balance for f in fees)
+                'balance': sum(f.balance for f in fees),
+                'credit_balance': child.credit_balance
             }
         })
 

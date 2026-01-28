@@ -4,13 +4,15 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import CourseList from './CourseList';
 import CourseForm from './CourseForm';
 import UserList from './UserList';
+import SchoolFinancialLedger from '../../components/admin/SchoolFinancialLedger';
 import FinanceOverview from '../../components/admin/FinanceOverview';
 import FeeManagement from './FeeManagement';
 import PaymentRecording from './PaymentRecording';
 import CurriculumRegistry from './CurriculumRegistry';
 import { useApi } from '../../hooks/useApi';
-import ParentRegistrationModal from '../../components/admin/ParentRegistrationModal';
 import UserRegistrationModal from '../../components/admin/UserRegistrationModal';
+import FeeFrameworkModal from '../../components/admin/FeeFrameworkModal';
+import AcademicCycleModal from '../../components/admin/AcademicCycleModal';
 
 const StatCard = ({ title, value, icon, color, link }) => (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 hover:shadow-lg transition-all group">
@@ -36,24 +38,24 @@ const Dashboard = () => {
     const { get } = useApi();
     const [stats, setStats] = useState({
         totalLearningAreas: 0,
-        activeLearningAreas: 0,
+        totalStrands: 0,
         totalTeachers: 0,
         totalStudents: 0,
     });
     const [loading, setLoading] = useState(true);
-    const [showParentModal, setShowParentModal] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
+    const [showFeeModal, setShowFeeModal] = useState(false);
+    const [showCycleModal, setShowCycleModal] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
             try {
                 const data = await get('/api/admin/stats/');
-                // Map legacy backend stats to new terminology
                 setStats({
-                    totalLearningAreas: data.totalLearningAreas,
-                    totalStrands: data.totalStrands,
-                    totalTeachers: data.totalTeachers,
-                    totalStudents: data.totalStudents
+                    totalLearningAreas: data.totalLearningAreas || 0,
+                    totalStrands: data.totalStrands || 0,
+                    totalTeachers: data.totalTeachers || 0,
+                    totalStudents: data.totalStudents || 0
                 });
             } catch (error) {
                 console.error('Error fetching stats:', error);
@@ -68,19 +70,19 @@ const Dashboard = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="text-gray-500">Loading...</div>
+                <div className="py-20 text-center animate-pulse text-[10px] font-black text-slate-300 uppercase tracking-widest">Querying System Status...</div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-10">
             {/* Header */}
-            <header className="relative bg-[#18216D] rounded-[2rem] p-10 text-white shadow-xl shadow-indigo-900/10 overflow-hidden">
-                <div className="absolute top-0 right-0 w-48 h-48 bg-[#FFC425]/10 rounded-full -mr-24 -mt-24 blur-2xl"></div>
+            <header className="relative bg-[#18216D] rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-900/10 overflow-hidden border border-white/5">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFC425]/10 rounded-full -mr-32 -mt-32 blur-3xl opacity-50"></div>
                 <div className="relative z-10">
-                    <h1 className="text-4xl font-black tracking-tighter uppercase">Administrative Hub</h1>
-                    <p className="text-indigo-100/70 mt-2 font-medium">Kianda School Excellence: Global system oversight and curriculum governance.</p>
+                    <h1 className="text-4xl font-black tracking-tighter uppercase italic">Administrative Hub</h1>
+                    <p className="text-indigo-100/50 mt-1.5 font-bold text-[11px] uppercase tracking-widest">Kianda School Excellence <span className="mx-2 text-indigo-100/20">|</span> Unified Oversight Gateway</p>
                 </div>
             </header>
 
@@ -117,46 +119,56 @@ const Dashboard = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-50 p-8">
+                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 bg-[#FFC425] rounded-full"></span> Dispatch Controls
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <button
-                        onClick={() => setShowParentModal(true)}
-                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all group shadow-sm bg-slate-50/50 text-left"
+                        onClick={() => setShowUserModal(true)}
+                        className="flex items-center space-x-6 p-6 bg-slate-50/50 border border-slate-100 rounded-[2rem] hover:border-[#18216D]/20 hover:bg-white hover:shadow-xl hover:shadow-indigo-900/5 transition-all group text-left"
                     >
-                        <span className="h-12 w-12 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
-                            <i className="fas fa-user-group"></i>
+                        <span className="h-14 w-14 rounded-2xl bg-indigo-50 text-[#18216D] flex items-center justify-center text-xl transition-transform group-hover:scale-110 shadow-sm border border-white">
+                            <i className="fas fa-user-plus"></i>
                         </span>
                         <div>
-                            <p className="font-bold text-gray-900 group-hover:text-amber-700">Link Parent</p>
-                            <p className="text-xs text-gray-500">Register and link parents</p>
+                            <p className="font-extrabold text-[#18216D] uppercase text-xs tracking-widest">Manage Users</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">Enroll Scholars, Faculty & Guardians</p>
                         </div>
                     </button>
 
                     <button
-                        onClick={() => setShowUserModal(true)}
-                        className="flex items-center space-x-4 p-4 border border-gray-100 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group shadow-sm bg-slate-50/50 text-left"
+                        onClick={() => setShowFeeModal(true)}
+                        className="flex items-center space-x-6 p-6 bg-slate-50/50 border border-slate-100 rounded-[2rem] hover:border-[#FFC425]/20 hover:bg-white hover:shadow-xl hover:shadow-amber-900/5 transition-all group text-left"
                     >
-                        <span className="h-12 w-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110">
-                            <i className="fas fa-user-gear"></i>
+                        <span className="h-14 w-14 rounded-2xl bg-amber-50 text-[#FFC425] flex items-center justify-center text-xl transition-transform group-hover:scale-110 shadow-sm border border-white">
+                            <i className="fas fa-file-invoice-dollar"></i>
                         </span>
                         <div>
-                            <p className="font-bold text-gray-900 group-hover:text-purple-700">Manage Users</p>
-                            <p className="text-xs text-gray-500">Add or edit users</p>
+                            <p className="font-extrabold text-[#18216D] uppercase text-xs tracking-widest">Manage Frameworks</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">Establish New Fee Structures</p>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => setShowCycleModal(true)}
+                        className="flex items-center space-x-6 p-6 bg-slate-50/50 border border-slate-100 rounded-[2rem] hover:border-emerald-500/20 hover:bg-white hover:shadow-xl hover:shadow-emerald-900/5 transition-all group text-left"
+                    >
+                        <span className="h-14 w-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110 shadow-sm border border-white">
+                            <i className="fas fa-calendar-days"></i>
+                        </span>
+                        <div>
+                            <p className="font-extrabold text-[#18216D] uppercase text-xs tracking-widest">Academic Cycle</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">Manage Years & Termly Sessions</p>
                         </div>
                     </button>
                 </div>
             </div>
 
-            {/* Parent Modal */}
-            {showParentModal && (
-                <ParentRegistrationModal onClose={() => setShowParentModal(false)} />
-            )}
-
-            {/* User Modal */}
-            {showUserModal && (
-                <UserRegistrationModal onClose={() => setShowUserModal(false)} />
-            )}
+            {/* Modals */}
+            {showUserModal && <UserRegistrationModal onClose={() => setShowUserModal(false)} />}
+            {showFeeModal && <FeeFrameworkModal onClose={() => setShowFeeModal(false)} />}
+            {showCycleModal && <AcademicCycleModal onClose={() => setShowCycleModal(false)} />}
 
             {/* Finance Overview */}
             <FinanceOverview />
@@ -168,6 +180,9 @@ const Dashboard = () => {
                     <p>No recent activity to display</p>
                 </div>
             </div>
+
+            {/* School-Wide Financial Ledger (Student Accounts) */}
+            <SchoolFinancialLedger />
         </div>
     );
 };

@@ -9,6 +9,8 @@ from .models import FeeStructure, StudentFee, Payment, Invoice
 class FeeStructureSerializer(serializers.ModelSerializer):
     """Serializer for FeeStructure model"""
     grade_level_name = serializers.CharField(source='grade_level.name', read_only=True)
+    academic_term_name = serializers.CharField(source='academic_term.name', read_only=True)
+    academic_year_name = serializers.CharField(source='academic_term.year.name', read_only=True)
     
     class Meta:
         model = FeeStructure

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from teachers.models import Teacher
 from students.models import Student
-from .models import Announcement, Notification
+from .models import Announcement, Notification, AcademicYear, AcademicTerm
 
 User = get_user_model()
 
@@ -49,12 +49,16 @@ class DynamicUserRegistrationSerializer(serializers.Serializer):
             phone = validated_data.pop('phone', '')
             grade_str = validated_data.pop('grade', '')
             
-            # Map grade string to GradeLevel object
+            # Map grade string to GradeLevel object robustly
             grade_level = None
             if grade_str:
+                import re
                 from cbc.models import GradeLevel
-                # Try exact match or clean match (e.g. "Grade 4" -> "Grade 4")
-                grade_level = GradeLevel.objects.filter(name__icontains=grade_str).first()
+                match = re.search(r'(\d+)', str(grade_str))
+                if match:
+                    grade_level = GradeLevel.objects.filter(name=f"Grade {match.group(1)}").first()
+                if not grade_level: # Fallback to icontains
+                    grade_level = GradeLevel.objects.filter(name__icontains=grade_str).first()
 
             student = Student.objects.create_user(
                 student_id=student_id,
@@ -161,4 +165,19 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
+        fields = '__all__'
+
+
+class AcademicTermSerializer(serializers.ModelSerializer):
+    year_name = serializers.CharField(source='year.name', read_only=True)
+    class Meta:
+        model = AcademicTerm
+        fields = ['id', 'year', 'year_name', 'name', 'start_date', 'end_date', 'is_final_term']
+
+
+class AcademicYearSerializer(serializers.ModelSerializer):
+    terms = AcademicTermSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AcademicYear
         fields = '__all__'

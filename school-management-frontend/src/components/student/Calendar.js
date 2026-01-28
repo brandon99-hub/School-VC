@@ -1,14 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
-const Calendar = ({ assignments }) => {
+const Calendar = ({ events = [] }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
 
     const daysInMonth = useMemo(() => {
         const year = currentDate.getFullYear();
-        const month = currentDate.getMonth();
-        const firstDay = new Date(year, month, 1).getDay();
-        const days = new Date(year, month + 1, 0).getDate();
+        const month = currentDate.getMonth(); // 0-indexed
+
+        // Helper to formatting date as YYYY-MM-DD using local time
+        const formatLocal = (y, m, d) => {
+            const mm = String(m + 1).padStart(2, '0');
+            const dd = String(d).padStart(2, '0');
+            return `${y}-${mm}-${dd}`;
+        };
+
+        const firstDay = new Date(year, month, 1).getDay(); // Day of week (0-6)
+        const days = new Date(year, month + 1, 0).getDate(); // Last day of month
 
         const calendarDays = [];
         // Pad with previous month's days
@@ -18,23 +26,24 @@ const Calendar = ({ assignments }) => {
         for (let i = 1; i <= days; i++) {
             calendarDays.push({
                 day: i,
-                fullDate: new Date(year, month, i).toISOString().split('T')[0]
+                fullDate: formatLocal(year, month, i)
             });
         }
         return calendarDays;
     }, [currentDate]);
 
-    const assignmentDates = useMemo(() => {
+    const eventDates = useMemo(() => {
         const dates = {};
-        assignments.forEach(a => {
-            if (a.due_date) {
-                const date = new Date(a.due_date).toISOString().split('T')[0];
-                if (!dates[date]) dates[date] = [];
-                dates[date].push(a);
+        events.forEach(ev => {
+            if (ev.due_date) {
+                // Parse due date strings robustly
+                const datePart = ev.due_date.split('T')[0];
+                if (!dates[datePart]) dates[datePart] = [];
+                dates[datePart].push(ev);
             }
         });
         return dates;
-    }, [assignments]);
+    }, [events]);
 
     const changeMonth = (offset) => {
         setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1));
@@ -67,26 +76,41 @@ const Calendar = ({ assignments }) => {
                     </div>
                 ))}
                 {daysInMonth.map((dateObj, idx) => {
-                    const hasAssignments = dateObj.fullDate && assignmentDates[dateObj.fullDate];
-                    const isToday = dateObj.fullDate === new Date().toISOString().split('T')[0];
+                    const hasEvents = dateObj.fullDate && eventDates[dateObj.fullDate];
+                    const isToday = dateObj.fullDate === new Date().toISOString().split('T')[0]; // Works if local time aligns, but safer to use local formatter
+
+                    // Robust check for today in local time
+                    const today = new Date();
+                    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    const isCurrentDay = dateObj.fullDate === todayStr;
 
                     return (
-                        <div key={idx} className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all ${dateObj.day ? 'hover:bg-slate-50 cursor-pointer group' : ''} ${isToday ? 'bg-[#18216D] text-white shadow-lg shadow-indigo-900/20' : 'text-[#18216D]'}`}>
+                        <div key={idx} className={`relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all ${dateObj.day ? 'hover:bg-slate-50 cursor-pointer group' : ''} ${isCurrentDay ? 'bg-[#18216D] text-white shadow-lg shadow-indigo-900/20' : 'text-[#18216D]'}`}>
                             {dateObj.day && (
                                 <>
-                                    <span className={`text-sm font-black ${isToday ? 'text-white' : 'text-[#18216D]'}`}>{dateObj.day}</span>
-                                    {hasAssignments && (
+                                    <span className={`text-sm font-black ${isCurrentDay ? 'text-white' : 'text-[#18216D]'}`}>{dateObj.day}</span>
+                                    {hasEvents && (
                                         <div className="flex gap-0.5 mt-1">
-                                            {assignmentDates[dateObj.fullDate].slice(0, 3).map((_, i) => (
-                                                <div key={i} className={`w-1 h-1 rounded-full ${isToday ? 'bg-[#FFC425]' : 'bg-[#FFC425]'}`} />
+                                            {eventDates[dateObj.fullDate].slice(0, 3).map((ev, i) => (
+                                                <div key={i} className={`w-1 h-1 rounded-full ${ev.is_completed ? 'bg-emerald-500' : 'bg-[#FFC425]'}`} />
                                             ))}
                                         </div>
                                     )}
-                                    {hasAssignments && (
+                                    {hasEvents && (
                                         <div className="absolute top-0 left-full ml-2 z-50 invisible group-hover:visible bg-white p-4 rounded-2xl shadow-2xl border border-slate-100 min-w-[200px]">
                                             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Deadlines</p>
-                                            {assignmentDates[dateObj.fullDate].map((a, i) => (
-                                                <div key={i} className="text-xs font-bold text-[#18216D] mb-1 leading-tight">• {a.title}</div>
+                                            {eventDates[dateObj.fullDate].map((ev, i) => (
+                                                <div key={i} className="mb-2 last:mb-0">
+                                                    <div className="text-xs font-bold text-[#18216D] leading-tight flex items-start gap-1">
+                                                        <span>•</span>
+                                                        <span>{ev.title}</span>
+                                                    </div>
+                                                    {ev.learning_area_name && (
+                                                        <div className="ml-2 mt-0.5 text-[8px] font-black text-slate-400 uppercase tracking-wider">
+                                                            {ev.learning_area_name}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
                                         </div>
                                     )}

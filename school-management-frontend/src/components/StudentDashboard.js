@@ -66,13 +66,19 @@ const StudentDashboard = () => {
 
         const allAssignments = courses.flatMap(c => (c.assignments || []).map(a => ({ ...a, courseName: c.name })));
 
+        // Aggregate quizzes as well
+        const allQuizzes = courses.flatMap(c => (c.quizzes || []).map(q => ({ ...q, courseName: c.name, type: 'Quiz' })));
+
+        const allEvents = [...allAssignments, ...allQuizzes];
+
         return {
             totalCourses,
             totalAssignments,
             completedAssignments,
             totalQuizzes,
             completedQuizzes,
-            allAssignments
+            allAssignments,
+            allEvents
         };
     }, [courses]);
 
@@ -125,7 +131,7 @@ const StudentDashboard = () => {
 
                 <section className="grid grid-cols-1 lg:grid-cols-10 gap-8">
                     <div className="lg:col-span-6">
-                        <Calendar assignments={overview.allAssignments} />
+                        <Calendar events={overview.allEvents} />
                     </div>
                     <div className="lg:col-span-4">
                         <RecentActivities />

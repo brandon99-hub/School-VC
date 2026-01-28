@@ -38,7 +38,7 @@ class ChildSerializer(serializers.ModelSerializer):
     """Lightweight serializer for student (child) info"""
     class Meta:
         model = Student
-        fields = ['id', 'student_id', 'first_name', 'last_name', 'email', 'grade', 'date_of_birth']
+        fields = ['id', 'student_id', 'first_name', 'last_name', 'email', 'grade', 'grade_level', 'date_of_birth']
         read_only_fields = fields
 
 

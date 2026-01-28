@@ -16,6 +16,8 @@ from .serializers import (
 )
 from .cache_service import FinanceCacheService
 from students.models import Student
+from core.models import AcademicTerm
+from cbc.models import GradeLevel
 
 
 # Parent/Student Endpoints
@@ -238,6 +240,73 @@ class StudentFeeViewSet(viewsets.ModelViewSet):
     queryset = StudentFee.objects.all()
     serializer_class = StudentFeeSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['post'])
+    def bulk_bill(self, request):
+        """
+        Bill multiple students or grades based on fee structures
+        POST /api/finance/student-fees/bulk_bill/
+        Body: { "grade_ids": [1, 2], "term_id": 5, "student_ids": [] }
+        """
+        grade_ids = request.data.get('grade_ids', [])
+        term_id = request.data.get('term_id')
+        student_ids = request.data.get('student_ids', [])
+
+        if not term_id:
+            return Response({'error': 'term_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        term = get_object_or_404(AcademicTerm, id=term_id)
+        students_to_bill = Student.objects.none()
+
+        if grade_ids:
+            students_to_bill = students_to_bill | Student.objects.filter(grade_level_id__in=grade_ids, is_superuser=False)
+        
+        if student_ids:
+            students_to_bill = students_to_bill | Student.objects.filter(id__in=student_ids, is_superuser=False)
+
+        students_to_bill = students_to_bill.distinct()
+        
+        created_count = 0
+        skipped_count = 0
+        no_structure_count = 0
+
+        for student in students_to_bill:
+            if not student.grade_level:
+                skipped_count += 1
+                continue
+
+            # Find matching fee structure
+            structure = FeeStructure.objects.filter(
+                grade_level=student.grade_level,
+                academic_term=term,
+                is_active=True
+            ).first()
+
+            if not structure:
+                no_structure_count += 1
+                continue
+
+            # Check if already billed
+            if StudentFee.objects.filter(student=student, fee_structure=structure).exists():
+                skipped_count += 1
+                continue
+
+            # Create the fee
+            StudentFee.objects.create(
+                student=student,
+                fee_structure=structure
+            )
+            created_count += 1
+            
+            # Invalidate cache
+            FinanceCacheService.invalidate_cache(student.id)
+
+        return Response({
+            'message': f'Billing complete.',
+            'created': created_count,
+            'skipped_already_exists': skipped_count,
+            'no_structure_found': no_structure_count
+        })
 
 
 class PaymentViewSet(viewsets.ModelViewSet):

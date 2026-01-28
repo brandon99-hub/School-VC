@@ -83,6 +83,26 @@ class AcademicYear(models.Model):
             AcademicYear.objects.exclude(pk=self.pk).update(is_current=False)
         super().save(*args, **kwargs)
 
+    def get_active_term(self, date=None):
+        from django.utils import timezone
+        if date is None:
+            date = timezone.now().date()
+        return self.terms.filter(start_date__lte=date, end_date__gte=date).first()
+
+class AcademicTerm(models.Model):
+    year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name='terms')
+    name = models.CharField(max_length=50)  # e.g., Term 1, Term 2, Term 3
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_final_term = models.BooleanField(default=False, help_text="Last term of the academic year")
+
+    class Meta:
+        ordering = ['start_date']
+        unique_together = ['year', 'name']
+
+    def __str__(self):
+        return f"{self.name} - {self.year.name}"
+
 class AccessLog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,  # Updated reference
