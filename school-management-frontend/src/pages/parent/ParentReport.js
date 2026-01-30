@@ -12,7 +12,8 @@ import {
     StarIcon,
     ChevronDownIcon,
     TrophyIcon,
-    ArrowLeftIcon
+    ArrowLeftIcon,
+    MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
 const ParentReport = () => {
@@ -22,6 +23,7 @@ const ParentReport = () => {
     const { showToast } = useAppState();
     const [loading, setLoading] = useState(true);
     const [reportData, setReportData] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fetchReport = useCallback(async () => {
         if (!childId) return;
@@ -229,22 +231,41 @@ const ParentReport = () => {
 
                 {/* Progress Grid */}
                 <div className="space-y-12">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-3xl font-black text-[#18216D] tracking-tight flex items-center gap-3">
-                                Competency Mastery Matrix
-                            </h2>
-                            <p className="text-slate-400 font-bold text-sm mt-1">Cross-sectional academic progression</p>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="flex-1">
+                            <div className="flex flex-col md:flex-row md:items-center gap-6">
+                                <div>
+                                    <h2 className="text-3xl font-black text-[#18216D] tracking-tight flex items-center gap-3">
+                                        Competency Mastery Matrix
+                                    </h2>
+                                    <p className="text-slate-400 font-bold text-sm mt-1">Cross-sectional academic progression</p>
+                                </div>
+                                <div className="relative flex-1 max-w-md">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <MagnifyingGlassIcon className="h-5 w-5 text-slate-300" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Search learning areas (e.g. Agriculture...)"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold text-[#18216D] placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-200 transition-all shadow-sm group-hover:shadow-md"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div className="space-y-16">
-                        {reportData.learning_areas?.map((area) => {
+                        {reportData.learning_areas?.filter(area =>
+                            area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            area.code.toLowerCase().includes(searchTerm.toLowerCase())
+                        ).map((area) => {
                             const progressionRating = area.mastery_percentage || 0;
                             const isPassing = progressionRating >= 80;
 
                             return (
-                                <div key={area.code} className="space-y-8">
+                                <div key={area.code} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3 mb-2">
@@ -267,6 +288,22 @@ const ParentReport = () => {
                                 </div>
                             );
                         })}
+                        {reportData.learning_areas?.filter(area =>
+                            area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            area.code.toLowerCase().includes(searchTerm.toLowerCase())
+                        ).length === 0 && (
+                                <div className="text-center py-20 bg-white rounded-[3rem] border border-dashed border-slate-200">
+                                    <MagnifyingGlassIcon className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                    <h3 className="text-xl font-black text-[#18216D] mb-1">No matches found</h3>
+                                    <p className="text-slate-400 font-bold text-sm">We couldn't find any learning areas matching "{searchTerm}"</p>
+                                    <button
+                                        onClick={() => setSearchTerm('')}
+                                        className="mt-6 text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                                    >
+                                        Clear search
+                                    </button>
+                                </div>
+                            )}
                     </div>
                 </div>
             </main>

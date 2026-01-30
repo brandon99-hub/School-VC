@@ -36,7 +36,8 @@ class AttendanceSerializer(serializers.ModelSerializer):
         extra_fields = ['course_name', 'course_code']
 
 class AssignmentSerializer(serializers.ModelSerializer):
-    submission_count = serializers.SerializerMethodField()
+    # Use annotation from queryset instead of SerializerMethodField to avoid N+1
+    submission_count = serializers.IntegerField(read_only=True)
     # CBC fields
     learning_area_name = serializers.CharField(source='learning_area.name', read_only=True)
     learning_outcome_description = serializers.CharField(source='learning_outcome.description', read_only=True)
@@ -63,12 +64,9 @@ class AssignmentSerializer(serializers.ModelSerializer):
     def get_teacher(self, obj):
         return obj.teacher_id
     
-    def get_submission_count(self, obj):
-        """Get the number of submissions for this assignment"""
-        return obj.submissions.count()
-
     def get_tested_outcomes_detail(self, obj):
         from cbc.serializers import LearningOutcomeListSerializer
+        # tested_outcomes already prefetched in queryset
         outcomes = obj.tested_outcomes.all()
         return LearningOutcomeListSerializer(outcomes, many=True).data
 
@@ -90,7 +88,7 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
             'competency_comment', 'student_name', 'student_id', 'assignment_title',
             'is_cbc_graded', 'competency_level_display'
         ]
-        read_only_fields = ('student',)
+        read_only_fields = ('student', 'assignment')
     
     def get_competency_level_display(self, obj):
         """Get full display name for competency level"""
@@ -210,24 +208,7 @@ class QuizSubmissionSerializer(serializers.ModelSerializer):
         return submission
 
     def get_competency_level(self, obj):
-        if obj.score is None:
-            return None
-        
-        quiz = obj.quiz
-        total = quiz.total_points
-        if total == 0:
-            return None
-            
-        percentage = (float(obj.score) / float(total)) * 100
-        
-        if percentage >= 80:
-            return 'EE'
-        elif percentage >= 60:
-            return 'ME'
-        elif percentage >= 40:
-            return 'AE'
-        else:
-            return 'BE'
+        return obj.get_competency_level()
 
 
 class LessonSerializer(serializers.ModelSerializer):

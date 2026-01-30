@@ -5,19 +5,26 @@ import DocumentUploader from './DocumentUploader';
 import ContentBlockCard from './ContentBlockCard';
 import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
+import {
+    PlusIcon,
+    PencilSquareIcon,
+    VideoCameraIcon,
+    DocumentTextIcon,
+    XMarkIcon
+} from '@heroicons/react/24/outline';
 
 const ContentManager = ({ lesson, onClose }) => {
     const { post, put } = useApi();
     const { showToast } = useAppState();
     const [contentBlocks, setContentBlocks] = useState(lesson.contents || []);
-    const [showAddMenu, setShowAddMenu] = useState(false);
     const [activeEditor, setActiveEditor] = useState(null);
     const [textContent, setTextContent] = useState('');
     const [saving, setSaving] = useState(false);
+    const [triggerSubmit, setTriggerSubmit] = useState(false);
 
     const handleAddContent = (type) => {
         setActiveEditor(type);
-        setShowAddMenu(false);
+        setTriggerSubmit(false);
         if (type === 'text') {
             setTextContent('');
         }
@@ -66,6 +73,7 @@ const ContentManager = ({ lesson, onClose }) => {
 
         setContentBlocks([...contentBlocks, newBlock]);
         setActiveEditor(null);
+        setTriggerSubmit(false);
     };
 
     const handleDeleteBlock = (blockId) => {
@@ -131,128 +139,117 @@ const ContentManager = ({ lesson, onClose }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-50 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
-                {/* Header */}
-                <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between sticky top-0 z-10">
+        <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+            onDragStart={(e) => e.stopPropagation()}
+            draggable="false"
+        >
+            <div
+                className="bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-100"
+                onDragStart={(e) => e.stopPropagation()}
+                draggable="false"
+            >
+                <div className="px-10 py-8 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-10">
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Manage Content</h2>
-                        <p className="text-sm text-gray-600">{lesson.title}</p>
+                        <h2 className="text-2xl font-black text-[#18216D] uppercase tracking-tight">Manage Content</h2>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                            <span className="text-[#FFC425] mr-2">/</span> {lesson.title}
+                        </p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-300 hover:text-red-500"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <XMarkIcon className="w-6 h-6 stroke-[2.5]" />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 space-y-6">
-                    {/* Add Content Button */}
+                <div className="flex-1 overflow-y-auto p-10 space-y-10">
+                    {/* Quick Add Ribbon */}
                     {!activeEditor && (
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowAddMenu(!showAddMenu)}
-                                className="w-full px-4 py-3 bg-white border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors font-medium text-gray-700 flex items-center justify-center space-x-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                <span>Add Content Block</span>
-                            </button>
-
-                            {/* Add Menu */}
-                            {showAddMenu && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-20">
-                                    <button
-                                        onClick={() => handleAddContent('text')}
-                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center space-x-3"
-                                    >
-                                        <span className="text-2xl">📝</span>
-                                        <div>
-                                            <p className="font-medium text-gray-900">Rich Text</p>
-                                            <p className="text-xs text-gray-500">Add formatted text content</p>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => handleAddContent('video')}
-                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center space-x-3 border-t border-gray-100"
-                                    >
-                                        <span className="text-2xl">🎥</span>
-                                        <div>
-                                            <p className="font-medium text-gray-900">Video</p>
-                                            <p className="text-xs text-gray-500">Embed YouTube or Vimeo</p>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => handleAddContent('document')}
-                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center space-x-3 border-t border-gray-100"
-                                    >
-                                        <span className="text-2xl">📄</span>
-                                        <div>
-                                            <p className="font-medium text-gray-900">Document</p>
-                                            <p className="text-xs text-gray-500">PDF, DOC, or other files</p>
-                                        </div>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            showToast('Please use the main "Quizzes" tab in the course view to manage quizzes for this lesson.', 'info');
-                                            setShowAddMenu(false);
-                                        }}
-                                        className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center space-x-3 border-t border-gray-100"
-                                    >
-                                        <span className="text-2xl">❓</span>
-                                        <div>
-                                            <p className="font-medium text-gray-900">Quiz</p>
-                                            <p className="text-xs text-gray-500">Manage via Quizzes tab</p>
-                                        </div>
-                                    </button>
+                        <div className="bg-[#18216D]/5 rounded-2xl p-2 flex flex-col md:flex-row items-center justify-between border border-[#18216D]/10">
+                            <div className="flex items-center gap-3 px-4 py-2">
+                                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-slate-100">
+                                    <PlusIcon className="w-4 h-4 text-[#18216D]" />
                                 </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Active Editor */}
-                    {activeEditor === 'text' && (
-                        <div className="bg-white rounded-lg p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Text Content</h3>
-                            <RichTextEditor
-                                value={textContent}
-                                onChange={setTextContent}
-                                placeholder="Start typing your lesson content..."
-                            />
-                            <div className="flex items-center justify-end space-x-4 mt-4">
+                                <div>
+                                    <p className="text-[10px] font-black text-[#18216D] uppercase tracking-widest leading-none">Swift-Add Toolbar</p>
+                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Direct sub-strand entry</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 p-1">
                                 <button
-                                    onClick={() => setActiveEditor(null)}
-                                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                                    onClick={() => handleAddContent('text')}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-100 rounded-[1rem] text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:border-[#18216D]/20 hover:bg-slate-50 transition-all shadow-sm hover:translate-y-[-1px] group"
                                 >
-                                    Cancel
+                                    <PencilSquareIcon className="w-4 h-4 text-[#18216D]/40 group-hover:text-[#18216D]" /> Rich Text
                                 </button>
                                 <button
-                                    onClick={handleSaveTextBlock}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                    onClick={() => handleAddContent('video')}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-100 rounded-[1rem] text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:border-[#FFC425]/40 hover:bg-amber-50/30 transition-all shadow-sm hover:translate-y-[-1px] group"
                                 >
-                                    Add Text Block
+                                    <VideoCameraIcon className="w-4 h-4 text-[#FFC425] group-hover:scale-110" /> Video
+                                </button>
+                                <button
+                                    onClick={() => handleAddContent('document')}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-100 rounded-[1rem] text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:border-emerald-500/20 hover:bg-emerald-50/30 transition-all shadow-sm hover:translate-y-[-1px] group"
+                                >
+                                    <DocumentTextIcon className="w-4 h-4 text-emerald-500 group-hover:scale-110" /> Document
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {activeEditor === 'video' && (
-                        <VideoUploader
-                            onSave={handleSaveVideoBlock}
-                            onCancel={() => setActiveEditor(null)}
-                        />
-                    )}
+                    {/* Active Editor */}
+                    {activeEditor && (
+                        <div className="animate-in fade-in zoom-in-95 duration-500">
+                            {activeEditor === 'text' && (
+                                <div className="bg-slate-50/50 rounded-[2.5rem] p-10 border border-slate-100">
+                                    <div className="flex items-center gap-3 mb-8">
+                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100">
+                                            <PencilSquareIcon className="w-6 h-6 text-[#18216D]" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-[#18216D] uppercase tracking-widest">Rich Text Editor</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Compose your lesson narrative</p>
+                                        </div>
+                                    </div>
+                                    <RichTextEditor
+                                        value={textContent}
+                                        onChange={setTextContent}
+                                        placeholder="Start typing your lesson content..."
+                                    />
+                                </div>
+                            )}
 
-                    {activeEditor === 'document' && (
-                        <DocumentUploader
-                            onSave={handleSaveDocumentBlock}
-                            onCancel={() => setActiveEditor(null)}
-                        />
+                            {activeEditor === 'video' && (
+                                <VideoUploader
+                                    onSave={(data) => {
+                                        handleSaveVideoBlock(data);
+                                        setTriggerSubmit(false);
+                                    }}
+                                    onCancel={() => {
+                                        setActiveEditor(null);
+                                        setTriggerSubmit(false);
+                                    }}
+                                    triggerSubmit={triggerSubmit}
+                                />
+                            )}
+
+                            {activeEditor === 'document' && (
+                                <DocumentUploader
+                                    onSave={(data) => {
+                                        handleSaveDocumentBlock(data);
+                                        setTriggerSubmit(false);
+                                    }}
+                                    onCancel={() => {
+                                        setActiveEditor(null);
+                                        setTriggerSubmit(false);
+                                    }}
+                                    triggerSubmit={triggerSubmit}
+                                />
+                            )}
+                        </div>
                     )}
 
                     {/* Content Blocks List */}
@@ -276,29 +273,66 @@ const ContentManager = ({ lesson, onClose }) => {
 
                     {/* Empty State */}
                     {contentBlocks.length === 0 && !activeEditor && (
-                        <div className="text-center py-12 text-gray-500">
-                            <div className="text-6xl mb-4">📚</div>
-                            <p className="text-lg font-medium mb-2">No content blocks yet</p>
-                            <p className="text-sm">Click "Add Content Block" to start building your lesson</p>
+                        <div className="text-center py-20 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 shadow-inner">
+                            <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-sm border border-slate-100">
+                                <PlusIcon className="h-10 w-10 text-slate-200" />
+                            </div>
+                            <h3 className="text-2xl font-black text-[#18216D] mb-2 tracking-tight uppercase italic">No Content Yet</h3>
+                            <p className="text-slate-400 max-w-sm mx-auto mb-10 font-medium italic text-sm">Your sub-strand is currently a blank canvas. Start building by selecting a content type below.</p>
+                            <div className="flex flex-wrap items-center justify-center gap-4 px-6">
+                                <button
+                                    onClick={() => handleAddContent('text')}
+                                    className="px-8 py-4 bg-white border border-slate-100 text-[#18216D] rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-indigo-900/5 hover:bg-[#18216D] hover:text-white transition-all group"
+                                >
+                                    <PencilSquareIcon className="w-5 h-5 mb-2 mx-auto group-hover:scale-110" />
+                                    <span>Create Text</span>
+                                </button>
+                                <button
+                                    onClick={() => handleAddContent('video')}
+                                    className="px-8 py-4 bg-white border border-slate-100 text-[#18216D] rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-amber-900/5 hover:bg-[#FFC425] transition-all group"
+                                >
+                                    <VideoCameraIcon className="w-5 h-5 mb-2 mx-auto group-hover:scale-110" />
+                                    <span>Embed Video</span>
+                                </button>
+                                <button
+                                    onClick={() => handleAddContent('document')}
+                                    className="px-8 py-4 bg-white border border-slate-100 text-[#18216D] rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-emerald-900/5 hover:bg-emerald-500 hover:text-white transition-all group"
+                                >
+                                    <DocumentTextIcon className="w-5 h-5 mb-2 mx-auto group-hover:scale-110" />
+                                    <span>Attach File</span>
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 bg-white border-t border-gray-200 flex items-center justify-end space-x-4 sticky bottom-0">
+                <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-4 sticky bottom-0">
                     <button
-                        onClick={onClose}
-                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                        onClick={activeEditor ? () => setActiveEditor(null) : onClose}
+                        className="px-8 py-3 bg-white border border-slate-200 text-[#18216D]/60 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:border-[#18216D] transition-all"
                     >
-                        Cancel
+                        {activeEditor ? 'Discard Draft' : 'Exit Manager'}
                     </button>
-                    <button
-                        onClick={handleSaveAll}
-                        disabled={saving}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {saving ? 'Saving...' : 'Save All Changes'}
-                    </button>
+                    {activeEditor ? (
+                        <button
+                            onClick={() => {
+                                if (activeEditor === 'text') handleSaveTextBlock();
+                                else setTriggerSubmit(true);
+                            }}
+                            className="px-10 py-3 bg-[#FFC425] text-[#18216D] rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-[#F0B40F] transition-all shadow-xl shadow-amber-900/10"
+                        >
+                            Confirm & Add Block
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleSaveAll}
+                            disabled={saving || contentBlocks.length === 0}
+                            className="px-10 py-3 bg-[#18216D] text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-[#0D164F] transition-all shadow-xl shadow-indigo-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {saving ? 'Syncing...' : 'Sync to Cloud'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

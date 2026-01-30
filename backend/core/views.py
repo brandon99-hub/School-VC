@@ -45,6 +45,13 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = [AllowAny]
     serializer_class = DynamicUserRegistrationSerializer
+    
+    def create(self, request, *args, **kwargs):
+        logger.info(f"Registration attempt with data: {request.data}")
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            logger.error(f"Registration validation failed: {serializer.errors}")
+        return super().create(request, *args, **kwargs)
 
 
 class UserView(APIView):

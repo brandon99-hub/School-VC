@@ -15,7 +15,7 @@ def module_lessons_list(request, module_id):
     module = get_object_or_404(Module, id=module_id)
     
     # Check if user is the teacher for this course
-    if not hasattr(request.user, 'teacher') or module.course.teacher != request.user.teacher:
+    if not hasattr(request.user, 'teacher') or module.learning_area.teacher != request.user.teacher:
         return Response(
             {'error': 'You do not have permission to manage this module'},
             status=status.HTTP_403_FORBIDDEN
@@ -48,7 +48,7 @@ def lesson_detail(request, lesson_id):
     lesson = get_object_or_404(Lesson, id=lesson_id)
     
     # Check if user is the teacher for this course
-    if not hasattr(request.user, 'teacher') or lesson.module.course.teacher != request.user.teacher:
+    if not hasattr(request.user, 'teacher') or lesson.module.learning_area.teacher != request.user.teacher:
         return Response(
             {'error': 'You do not have permission to manage this lesson'},
             status=status.HTTP_403_FORBIDDEN

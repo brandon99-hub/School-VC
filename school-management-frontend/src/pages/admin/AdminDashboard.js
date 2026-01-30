@@ -173,14 +173,6 @@ const Dashboard = () => {
             {/* Finance Overview */}
             <FinanceOverview />
 
-            {/* Recent Activity (Placeholder) */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
-                <div className="text-center py-8 text-gray-500">
-                    <p>No recent activity to display</p>
-                </div>
-            </div>
-
             {/* School-Wide Financial Ledger (Student Accounts) */}
             <SchoolFinancialLedger />
         </div>

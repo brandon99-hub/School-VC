@@ -311,6 +311,26 @@ class QuizSubmission(models.Model):
     def __str__(self):
         return f"{self.quiz.title} · {self.student.get_full_name()} · Attempt {self.attempt_number}"
 
+    def get_competency_level(self):
+        """Calculates competency level based on score percentage"""
+        if self.score is None:
+            return None
+        
+        total = self.quiz.total_points
+        if not total or total == 0:
+            return None
+            
+        percentage = (float(self.score) / float(total)) * 100
+        
+        if percentage >= 80:
+            return 'EE'
+        elif percentage >= 60:
+            return 'ME'
+        elif percentage >= 40:
+            return 'AE'
+        else:
+            return 'BE'
+
 
 class QuizResponse(models.Model):
     submission = models.ForeignKey(QuizSubmission, on_delete=models.CASCADE, related_name='responses')

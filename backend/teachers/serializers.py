@@ -75,13 +75,15 @@ class LearningAreaSerializer(serializers.ModelSerializer):
     learning_summary = serializers.SerializerMethodField()
     student_progress = serializers.SerializerMethodField()
     progress = serializers.SerializerMethodField()
+    ungraded_submissions_count = serializers.SerializerMethodField()
 
     class Meta:
         model = LearningArea
         fields = [
             'id', 'name', 'code', 'is_active', 'grade_level_name', 'teacher_name', 'teacher',
             'enrolled_students_count', 'enrolled_students', 'assignments', 'modules', 'progress',
-            'quizzes', 'student_submissions', 'learning_summary', 'student_progress'
+            'quizzes', 'student_submissions', 'learning_summary', 'student_progress',
+            'ungraded_submissions_count'
         ]
     
     def get_progress(self, obj):
@@ -145,6 +147,13 @@ class LearningAreaSerializer(serializers.ModelSerializer):
             'completed_quizzes': completed_quizzes,
             'overall_progress': 0
         }
+
+    def get_ungraded_submissions_count(self, obj):
+        from courses.models import AssignmentSubmission
+        return AssignmentSubmission.objects.filter(
+            assignment__learning_area=obj,
+            status__iexact='submitted'
+        ).count()
 
 class CourseSerializer(serializers.ModelSerializer):
     """Enhanced course serializer with nested student and assignment data"""

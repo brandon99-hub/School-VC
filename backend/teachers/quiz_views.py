@@ -18,8 +18,8 @@ def lesson_quizzes_api(request, lesson_id):
     
     try:
         lesson = Lesson.objects.get(id=lesson_id)
-        learning_area_entity = lesson.module.course.teacher if hasattr(lesson.module.course, 'teacher') else None
-        course_teacher = learning_area_entity
+        learning_area_entity = lesson.module.learning_area if hasattr(lesson.module, 'learning_area') else None
+        course_teacher = learning_area_entity.teacher if learning_area_entity else None
     except Lesson.DoesNotExist:
         # Fallback to CBC SubStrand
         try:
@@ -32,7 +32,7 @@ def lesson_quizzes_api(request, lesson_id):
     # Check if user is the teacher for this course/learning area
     is_teacher = False
     if hasattr(request.user, 'teacher'):
-        if lesson and lesson.module.course.teacher == request.user.teacher:
+        if lesson and lesson.module.learning_area and lesson.module.learning_area.teacher == request.user.teacher:
             is_teacher = True
         elif learning_area and learning_area.teacher == request.user.teacher:
             is_teacher = True
@@ -74,7 +74,7 @@ def quiz_detail_api(request, quiz_id):
     # Check if user is the teacher for this area (supports both Course and Learning Area)
     is_teacher = False
     if hasattr(request.user, 'teacher'):
-        if quiz.lesson and quiz.lesson.module.course.teacher == request.user.teacher:
+        if quiz.lesson and quiz.lesson.module.learning_area and quiz.lesson.module.learning_area.teacher == request.user.teacher:
             is_teacher = True
         elif quiz.learning_area and quiz.learning_area.teacher == request.user.teacher:
             is_teacher = True
@@ -109,7 +109,7 @@ def quiz_question_api(request, quiz_id, question_id=None):
     # Check if user is the teacher for this area (supports both Course and Learning Area)
     is_teacher = False
     if hasattr(request.user, 'teacher'):
-        if quiz.lesson and quiz.lesson.module.course.teacher == request.user.teacher:
+        if quiz.lesson and quiz.lesson.module.learning_area and quiz.lesson.module.learning_area.teacher == request.user.teacher:
             is_teacher = True
         elif quiz.learning_area and quiz.learning_area.teacher == request.user.teacher:
             is_teacher = True

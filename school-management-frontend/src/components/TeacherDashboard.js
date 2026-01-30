@@ -5,7 +5,6 @@ import { useAppState } from '../context/AppStateContext';
 import GradeForm from './GradeForm';
 import TeacherInfo from './TeacherInfo';
 import {
-    AcademicCapIcon,
     ClipboardDocumentCheckIcon,
     UserGroupIcon,
     BookOpenIcon,
@@ -152,8 +151,10 @@ const TeacherDashboard = () => {
     const { courses, uniqueStudentCount, pendingActions, loading, error, refresh } = useAppState();
     const [selectedAssignment, setSelectedAssignment] = useState(null);
     const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [searchTerm, setSearchTerm] = useState('');
+    const cardsPerPage = 3;
 
-    const fullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Guest' : 'Guest';
 
     const overview = useMemo(() => {
         const totalStudents = uniqueStudentCount || 0;
@@ -176,6 +177,28 @@ const TeacherDashboard = () => {
             gradedAssignments: gradedCount
         };
     }, [courses, uniqueStudentCount]);
+
+    // Calculate upcoming deadlines (assignments due in next 7 days)
+    const upcomingDeadlines = useMemo(() => {
+        const now = new Date();
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        const upcoming = courses.flatMap(course =>
+            (course.assignments || [])
+                .filter(asgn => {
+                    const dueDate = new Date(asgn.due_date);
+                    return dueDate >= now && dueDate <= sevenDaysFromNow;
+                })
+                .map(asgn => ({
+                    ...asgn,
+                    courseName: course.name,
+                    courseCode: course.code,
+                    dueDate: new Date(asgn.due_date)
+                }))
+        ).sort((a, b) => a.dueDate - b.dueDate);
+
+        return upcoming;
+    }, [courses]);
 
     const handleRefresh = () => {
         refresh();
@@ -217,95 +240,201 @@ const TeacherDashboard = () => {
                 </section>
 
                 <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <TeacherInfo teacher={user} />
+                    <TeacherInfo />
                     <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div>
                                 <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">National Standards</p>
                                 <h2 className="text-xl font-semibold text-gray-900">Assigned Learning Areas</h2>
                             </div>
-                            <button
-                                onClick={handleRefresh}
-                                className="text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:text-[#FFC425] transition-colors"
-                            >
-                                Sync Data
-                            </button>
+                            <div className="relative w-64 lg:w-80">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                    <i className="fas fa-search"></i>
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Search learning areas..."
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#18216D]/20 focus:bg-white transition-all text-sm font-medium text-[#18216D]"
+                                />
+                            </div>
                         </div>
                         {courses.length === 0 ? (
                             <div className="p-6 text-gray-500 text-sm italic">
                                 No national standards assigned yet. Please contact administration to link your profile to your Learning Areas.
                             </div>
-                        ) : (
-                            <div className="p-6 space-y-4">
-                                {courses.map((course) => (
-                                    <div
-                                        key={course.id}
-                                        onClick={() => navigate(`/teacher/courses/${course.id}`)}
-                                        className="block border border-slate-100 rounded-[2rem] p-6 hover:border-[#FFC425] hover:bg-white hover:shadow-xl hover:shadow-indigo-900/5 transition-all cursor-pointer group"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFC425]">
-                                                    {course.code}
-                                                </p>
-                                                <h3 className="text-xl font-black text-[#18216D] group-hover:translate-x-1 transition-transform">{course.name}</h3>
-                                            </div>
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                                                {course.enrolled_students_count || 0} Scholars
-                                            </span>
-                                        </div>
-                                        <div className="mt-4 grid gap-3">
-                                            {(course.assignments || []).slice(0, 2).map((assignment) => (
-                                                <div
-                                                    key={assignment.id}
-                                                    className="flex items-center justify-between bg-white bg-opacity-50 rounded-lg px-3 py-2 border border-gray-50"
-                                                >
+                        ) : (() => {
+                            // Filter courses based on search term
+                            const filteredCourses = courses.filter(course =>
+                                course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                course.code.toLowerCase().includes(searchTerm.toLowerCase())
+                            );
+
+                            const indexOfLastCard = currentPage * cardsPerPage;
+                            const indexOfFirstCard = indexOfLastCard - cardsPerPage;
+                            const currentCourses = filteredCourses.slice(indexOfFirstCard, indexOfLastCard);
+                            const totalPages = Math.ceil(filteredCourses.length / cardsPerPage);
+
+                            return (
+                                <>
+                                    <div className="p-6 space-y-4">
+                                        {currentCourses.map((course) => (
+                                            <div
+                                                key={course.id}
+                                                onClick={() => navigate(`/teacher/courses/${course.id}`)}
+                                                className="block border border-slate-100 rounded-[2rem] p-6 hover:border-[#FFC425] hover:bg-white hover:shadow-xl hover:shadow-indigo-900/5 transition-all cursor-pointer group"
+                                            >
+                                                <div className="flex items-center justify-between">
                                                     <div>
-                                                        <p className="text-sm font-semibold text-gray-800">
-                                                            {assignment.title}
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFC425]">
+                                                            {course.code}
                                                         </p>
-                                                        <p className="text-xs text-gray-500">
-                                                            Due {new Date(assignment.due_date).toLocaleDateString()}
-                                                        </p>
+                                                        <h3 className="text-xl font-black text-[#18216D] group-hover:translate-x-1 transition-transform">{course.name}</h3>
                                                     </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <Link
-                                                            to={`/teacher/assignments/${assignment.id}/submissions`}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                            }}
-                                                            className="p-2 text-slate-300 hover:text-[#18216D] transition-colors"
-                                                            title="View Submissions"
-                                                        >
-                                                            <DocumentTextIcon className="w-5 h-5" />
-                                                        </Link>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                setSelectedAssignment(assignment.id);
-                                                            }}
-                                                            className="text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:text-[#FFC425] transition-all"
-                                                        >
-                                                            Grade Task
-                                                        </button>
-                                                    </div>
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                                                        {course.enrolled_students_count || 0} Scholars
+                                                    </span>
                                                 </div>
-                                            ))}
-                                            {(!course.assignments || !course.assignments.length) && (
-                                                <p className="text-sm text-gray-400">
-                                                    No assignments configured for this learning area.
-                                                </p>
-                                            )}
-                                        </div>
+                                                <div className="mt-4 grid gap-3">
+                                                    {(course.assignments || []).slice(0, 2).map((assignment) => (
+                                                        <div
+                                                            key={assignment.id}
+                                                            className="flex items-center justify-between bg-white bg-opacity-50 rounded-lg px-3 py-2 border border-gray-50"
+                                                        >
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-gray-800">
+                                                                    {assignment.title}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    Due {new Date(assignment.due_date).toLocaleDateString()}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <Link
+                                                                    to={`/teacher/assignments/${assignment.id}/submissions`}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                    }}
+                                                                    className="p-2 text-slate-300 hover:text-[#18216D] transition-colors"
+                                                                    title="View Submissions"
+                                                                >
+                                                                    <DocumentTextIcon className="w-5 h-5" />
+                                                                </Link>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setSelectedAssignment(assignment.id);
+                                                                    }}
+                                                                    className="text-[10px] font-black uppercase tracking-widest text-[#18216D] hover:text-[#FFC425] transition-all"
+                                                                >
+                                                                    Grade Task
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {(!course.assignments || !course.assignments.length) && (
+                                                        <p className="text-sm text-gray-400">
+                                                            No assignments configured for this learning area.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                    {totalPages > 1 && (
+                                        <div className="px-6 pb-6 flex items-center justify-center gap-4">
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                disabled={currentPage === 1}
+                                                className="px-4 py-2 bg-slate-50 text-[#18216D] rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                Previous
+                                            </button>
+                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                Page {currentPage} of {totalPages}
+                                            </span>
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                disabled={currentPage === totalPages}
+                                                className="px-4 py-2 bg-slate-50 text-[#18216D] rounded-xl font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 </section>
 
-                <section className="grid grid-cols-1 gap-6">
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Upcoming Deadlines Card */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-black text-[#18216D] flex items-center uppercase tracking-tight">
+                                <i className="far fa-calendar-alt mr-3 text-[#FFC425]"></i>
+                                Upcoming Deadlines
+                            </h3>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                Next 7 Days
+                            </span>
+                        </div>
+                        <div className="space-y-4">
+                            {upcomingDeadlines.length > 0 ? (
+                                upcomingDeadlines.slice(0, 5).map(assignment => {
+                                    const daysUntilDue = Math.ceil((assignment.dueDate - new Date()) / (1000 * 60 * 60 * 24));
+                                    const isUrgent = daysUntilDue <= 2;
+
+                                    return (
+                                        <div key={assignment.id} className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50 hover:bg-white hover:shadow-xl hover:shadow-indigo-900/5 transition-all group">
+                                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isUrgent ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                    <ClipboardDocumentCheckIcon className="w-5 h-5" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest border border-indigo-100">
+                                                            {assignment.courseCode}
+                                                        </span>
+                                                        {isUrgent && (
+                                                            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-widest animate-pulse">
+                                                                Urgent
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="font-black text-sm text-[#18216D] tracking-tight truncate">{assignment.title}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                                        Due {assignment.dueDate.toLocaleDateString()} • {daysUntilDue} day{daysUntilDue !== 1 ? 's' : ''} left
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Link
+                                                to={`/teacher/assignments/${assignment.id}/submissions`}
+                                                className="px-4 py-2.5 bg-[#18216D] text-white text-[9px] font-black rounded-xl hover:bg-[#0D164F] transition-all uppercase tracking-widest shadow-lg shadow-indigo-900/10 shrink-0"
+                                            >
+                                                View
+                                            </Link>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-12">
+                                    <div className="h-16 w-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                        <i className="far fa-calendar-check text-slate-200 text-3xl"></i>
+                                    </div>
+                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">No upcoming deadlines in the next 7 days</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Pending Actions Card */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-black text-[#18216D] flex items-center uppercase tracking-tight">

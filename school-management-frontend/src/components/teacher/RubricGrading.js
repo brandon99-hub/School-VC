@@ -3,7 +3,7 @@ import { useApi } from '../../hooks/useApi';
 import { useAppState } from '../../context/AppStateContext';
 
 const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) => {
-    const { post, put } = useApi();
+    const { post, put, patch } = useApi();
     const { showToast } = useAppState();
     const [competencyLevel, setCompetencyLevel] = useState(submission?.competency_level || '');
     const [comment, setComment] = useState(submission?.competency_comment || '');
@@ -66,7 +66,7 @@ const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) =>
                 status: 'graded'
             };
 
-            await put(`/api/assignment-submissions/${submission.id}/`, payload);
+            await patch(`/api/assignment-submissions/${submission.id}/`, payload);
 
             // Build a unique list of outcomes to grade (primary + tested)
             const outcomeMap = new Map();
@@ -102,7 +102,7 @@ const RubricGrading = ({ submission, assignment, onGraded, onNext, hasNext }) =>
         } finally {
             setSubmitting(false);
         }
-    }, [competencyLevel, comment, submission.id, submission.student, submission.teacher, assignment.learning_outcome, assignment.title, assignment.teacher, put, post, showToast, onGraded, hasNext, onNext]);
+    }, [competencyLevel, comment, submission.id, submission.student, submission.teacher, assignment.learning_outcome, assignment.title, assignment.teacher, assignment.tested_outcomes_detail, put, post, patch, showToast, onGraded, hasNext, onNext]);
 
     // Keyboard shortcuts: 1=EE, 2=ME, 3=AE, 4=BE
     useEffect(() => {

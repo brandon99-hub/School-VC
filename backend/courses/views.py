@@ -320,7 +320,23 @@ class CourseViewSet(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
-        queryset = Course.objects.all()
+        from django.db import models
+        # Optimize with select_related and prefetch_related to avoid N+1 queries
+        queryset = Course.objects.select_related(
+            'teacher',
+            'teacher__user',
+            'learning_area',
+            'learning_area__grade_level'
+        ).prefetch_related(
+            'students',
+            'assignment_set',
+            'assignment_set__tested_outcomes',
+            'assignment_set__submissions',
+            'schedule_set'
+        ).annotate(
+            submission_count=models.Count('assignment__submissions', distinct=True)
+        )
+        
         grade_level = self.request.query_params.get('grade_level')
         if grade_level:
             queryset = queryset.filter(learning_area__grade_level_id=grade_level)
@@ -447,7 +463,23 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        from django.db import models
+        # Optimize with select_related, prefetch_related, and annotations
+        queryset = Assignment.objects.select_related(
+            'learning_area',
+            'learning_area__grade_level',
+            'learning_outcome',
+            'learning_outcome__sub_strand',
+            'learning_outcome__sub_strand__strand'
+        ).prefetch_related(
+            'tested_outcomes',
+            'tested_outcomes__sub_strand',
+            'submissions',
+            'submissions__student'
+        ).annotate(
+            submission_count=models.Count('submissions', distinct=True)
+        )
+        
         course_id = self.request.query_params.get('course')
         if course_id:
             queryset = queryset.filter(course_id=course_id)
@@ -901,7 +933,8 @@ def course_gradebook_api(request, pk):
                     'score': float(submission.score or 0),
                     'total': float(quiz.total_points),
                     'status': submission.status,
-                    'submission_id': submission.id
+                    'submission_id': submission.id,
+                    'competency_level': submission.get_competency_level()
                 }
             else:
                 student_data['quiz_grades'][str(quiz.id)] = None

@@ -91,14 +91,14 @@ const StudentDashboard = () => {
                         <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#FFC425] mb-2">Scholar Portal</p>
                         <h1 className="text-4xl sm:text-6xl font-black tracking-tighter italic">Welcome, {fullName}</h1>
                         <p className="text-indigo-100/70 max-w-2xl font-medium text-lg mt-6">
-                            View your subjects, track assignments, and monitor your progress.
+                            View your learning areas, track assignments, and monitor your progress.
                         </p>
                     </div>
                 </header>
 
                 <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <StatCard
-                        label="Subjects"
+                        label="Learning Areas"
                         value={overview.totalCourses}
                         delta="Academic Subjects"
                         trend="up"
@@ -112,7 +112,7 @@ const StudentDashboard = () => {
                         icon={AcademicCapIcon}
                     />
                     <StatCard
-                        label="Tests"
+                        label="Quizzes"
                         value={overview.totalQuizzes}
                         delta={`${overview.completedQuizzes} Done`}
                         trend="up"

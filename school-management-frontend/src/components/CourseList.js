@@ -224,26 +224,23 @@ const CourseList = () => {
                                             </div>
                                             {course.teacher_name}
                                         </div>
-                                        <div className="flex items-center text-sm font-bold text-gray-400">
-                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                                                <i className="fas fa-calendar-alt text-[10px]" />
+                                        <div className="flex items-center gap-4 text-sm font-bold">
+                                            <div className="flex items-center text-indigo-600">
+                                                <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center mr-2">
+                                                    <i className="fas fa-tasks text-[10px]" />
+                                                </div>
+                                                {course.assignments?.length || 0} Assignments
                                             </div>
-                                            {course.schedule}
+                                            <div className="flex items-center text-amber-600">
+                                                <div className="w-6 h-6 rounded-full bg-amber-50 flex items-center justify-center mr-2">
+                                                    <i className="fas fa-question-circle text-[10px]" />
+                                                </div>
+                                                {course.quizzes?.length || 0} Quizzes
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="mt-8">
-                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                                            <span>Sub-strand Progress</span>
-                                            <span className="text-[#18216D]">{course.progress}%</span>
-                                        </div>
-                                        <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                                            <div
-                                                className={`${getProgressColor(course.progress)} h-full rounded-full transition-all duration-1000 ease-out`}
-                                                style={{ width: `${course.progress}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
+
 
                                     <button
                                         className="w-full mt-8 py-4 bg-slate-50 text-[#18216D] rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-[#18216D] hover:text-white transition-all shadow-sm group-hover:shadow-xl group-hover:shadow-indigo-900/10 flex items-center justify-center space-x-2"

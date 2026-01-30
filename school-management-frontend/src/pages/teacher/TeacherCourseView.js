@@ -215,9 +215,6 @@ const TeacherCourseView = () => {
                                 </svg>
                             </button>
                             <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-sm border border-slate-100">
-                                    <img src="/kianda-school-logo.png" alt="Kianda School" className="h-full object-contain" />
-                                </div>
                                 <div>
                                     <h1 className="text-2xl font-black text-[#18216D] tracking-tighter flex items-center leading-none">
                                         {course.name}

@@ -47,25 +47,7 @@ const StudentInfo = ({ student }) => {
           <p className="text-lg font-semibold text-gray-800">{displayStudent.grade}</p>
         </div>
 
-        <div>
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 flex items-center">
-            <i className="fas fa-chart-line mr-2 text-[#18216D]" aria-hidden="true"></i>
-            Attendance Performance
-          </h3>
-          <div className="relative pt-1">
-            <div className="flex mb-3 items-center justify-between">
-              <span className="text-xl font-black inline-block text-[#18216D]">
-                {displayStudent.attendancePercentage}%
-              </span>
-            </div>
-            <div className="overflow-hidden h-3 text-xs flex rounded-full bg-slate-100">
-              <div
-                style={{ width: `${displayStudent.attendancePercentage}%` }}
-                className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-[#18216D] transition-all duration-1000 ease-out"
-              ></div>
-            </div>
-          </div>
-        </div>
+
 
         <div className="border-t border-slate-50 pt-8">
           <div className="grid grid-cols-1 gap-3">
@@ -77,13 +59,14 @@ const StudentInfo = ({ student }) => {
               View Full Profile
             </button>
             <div className="grid grid-cols-2 gap-3">
-              <button
+              <a
+                href="/courses"
                 className="flex items-center justify-center px-4 py-3 border-2 border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#18216D] bg-white hover:bg-slate-50 transition-all"
-                aria-label="View Courses"
+                aria-label="View Learning Areas"
               >
                 <i className="fas fa-book mr-2" aria-hidden="true"></i>
-                Courses
-              </button>
+                Learning Areas
+              </a>
               <button
                 className="flex items-center justify-center px-4 py-3 border-2 border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#18216D] bg-white hover:bg-slate-50 transition-all"
                 aria-label="View Schedule"

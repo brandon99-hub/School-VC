@@ -235,7 +235,8 @@ const GradeBook = ({ courseId }) => {
 
                                     {gradebook.quizzes && gradebook.quizzes.map((quiz) => {
                                         const quizGrade = student.quiz_grades ? student.quiz_grades[quiz.id] : null;
-                                        const levelCode = quizGrade ? calculateLevel(quizGrade.score, quizGrade.total) : null;
+                                        // Prioritize backend-calculated levels for academic consistency
+                                        const levelCode = quizGrade?.competency_level || (quizGrade ? calculateLevel(quizGrade.score, quizGrade.total) : null);
                                         const levelData = levelCode ? getLevelData(levelCode) : null;
 
                                         return (
@@ -269,7 +270,7 @@ const GradeBook = ({ courseId }) => {
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                    <strong>Tip:</strong> Click on any grade cell to edit. Grades are automatically converted to letter grades (A-F).
+                    <strong>Tip:</strong> Click on any grade cell to edit. Quizzes use CBC competency levels (EE, ME, AE, BE) based on a unified 80/60/40 threshold.
                 </p>
             </div>
         </div>

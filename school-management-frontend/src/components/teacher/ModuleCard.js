@@ -32,7 +32,7 @@ const ModuleCard = ({ module, onEdit, onDelete, onTogglePublish, onRefresh }) =>
         }
 
         try {
-            await del(`/api/teacher/lessons/${lesson.id}/`);
+            await del(`/teachers/api/lessons/${lesson.id}/`);
             onRefresh();
             showToast('Lesson deleted successfully!', 'success');
         } catch (error) {
@@ -43,14 +43,15 @@ const ModuleCard = ({ module, onEdit, onDelete, onTogglePublish, onRefresh }) =>
 
     const handleToggleLessonPublish = async (lesson) => {
         try {
-            await put(`/api/teacher/lessons/${lesson.id}/`, {
+            await put(`/teachers/api/lessons/${lesson.id}/`, {
                 ...lesson,
                 is_published: !lesson.is_published
             });
             onRefresh();
+            showToast(`Sub-strand ${lesson.is_published ? 'unpublished' : 'published'} successfully!`, 'success');
         } catch (error) {
             console.error('Error toggling lesson publish status:', error);
-            alert('Failed to update lesson');
+            showToast('Failed to update sub-strand status. Please try again.', 'error');
         }
     };
 

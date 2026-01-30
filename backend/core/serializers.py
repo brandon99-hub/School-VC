@@ -16,15 +16,34 @@ class DynamicUserRegistrationSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
     # Student-specific fields
     student_id = serializers.CharField(required=False)
-    date_of_birth = serializers.DateField(required=False)
-    gender = serializers.ChoiceField(choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')], required=False)
-    address = serializers.CharField(required=False)
-    phone = serializers.CharField(required=False)
-    grade = serializers.CharField(required=False)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.ChoiceField(choices=[('M', 'Male'), ('F', 'Female'), ('O', 'Other')], required=False, allow_blank=True, allow_null=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    grade = serializers.CharField(required=False, allow_blank=True)
     # Teacher-specific field
     teacher_id = serializers.CharField(required=False, write_only=True)
+    
+    def to_internal_value(self, data):
+        # Convert empty strings to None for fields that don't accept empty strings
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if data.get('date_of_birth') == '':
+            data['date_of_birth'] = None
+        if data.get('gender') == '':
+            data['gender'] = None
+        return super().to_internal_value(data)
 
     def validate(self, attrs):
+        # Convert empty strings to None for optional fields (backup)
+        if attrs.get('date_of_birth') == '':
+            attrs['date_of_birth'] = None
+        if attrs.get('gender') == '':
+            attrs['gender'] = None
+        if attrs.get('address') == '':
+            attrs['address'] = ''
+        if attrs.get('phone') == '':
+            attrs['phone'] = ''
+            
         role = attrs.get('role')
         if role == 'student' and not attrs.get('student_id'):
             raise serializers.ValidationError("Student ID is required for student registration.")

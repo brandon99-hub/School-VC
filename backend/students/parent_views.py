@@ -341,11 +341,20 @@ class ParentViewSet(viewsets.ModelViewSet):
             student=child
         )
         
-        # Get recent assignments
+        # Get recent assignments with optimized queries
         assignments = Assignment.objects.filter(
             models.Q(learning_area__grade_level=child.grade_level) | 
             models.Q(learning_area__students=child) |
             models.Q(course__students=child)
+        ).select_related(
+            'learning_area',
+            'learning_area__grade_level',
+            'learning_outcome',
+            'learning_outcome__sub_strand',
+            'learning_outcome__sub_strand__strand'
+        ).prefetch_related(
+            'tested_outcomes',
+            'tested_outcomes__sub_strand'
         ).distinct().annotate(
             is_completed=Exists(assignment_submissions)
         ).order_by('-created_at')[:10]
@@ -356,21 +365,24 @@ class ParentViewSet(viewsets.ModelViewSet):
             student=child
         )
 
-        # Get recent quizzes
+        # Get recent quizzes with optimized queries
         quizzes = Quiz.objects.filter(
             models.Q(learning_area__grade_level=child.grade_level) |
             models.Q(learning_area__students=child) |
             models.Q(lesson__module__learning_area__grade_level=child.grade_level) |
             models.Q(lesson__module__learning_area__students=child)
+        ).select_related(
+            'learning_area',
+            'lesson',
+            'lesson__module',
+            'lesson__module__learning_area'
+        ).prefetch_related(
+            'questions'
         ).distinct().annotate(
             is_completed=Exists(quiz_submissions)
         ).order_by('-created_at')[:10]
 
-        # Use partial serialization or ensure the serializer handles the annotation if possible, 
-        # but since we are using existing serializers, we might need to manually inject or ensure they exist.
-        # However, it's safer to just send the data with a small wrapper if serializer is strict.
-        
-        # We'll update the serializer later or just manually map here for the activity feed.
+        # Serialize with prefetched data
         asgn_data = AssignmentSerializer(assignments, many=True).data
         for i, a in enumerate(assignments):
             asgn_data[i]['is_completed'] = a.is_completed
@@ -404,13 +416,27 @@ class ParentViewSet(viewsets.ModelViewSet):
             student=child
         )
 
-        # Fetch everything with a due date
+        # Filter for next 30 days only
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        today = timezone.now().date()
+        next_30_days = today + timedelta(days=30)
+
+        # Fetch assignments with due dates in next 30 days with optimized queries
         assignments = Assignment.objects.filter(
-            due_date__isnull=False
+            due_date__isnull=False,
+            due_date__gte=today,
+            due_date__lte=next_30_days
         ).filter(
             models.Q(learning_area__grade_level=child.grade_level) | 
             models.Q(learning_area__students=child) |
             models.Q(course__students=child)
+        ).select_related(
+            'learning_area',
+            'learning_area__grade_level',
+            'learning_outcome'
+        ).prefetch_related(
+            'tested_outcomes'
         ).distinct().annotate(
             is_completed=Exists(asgn_submissions)
         )
@@ -421,13 +447,22 @@ class ParentViewSet(viewsets.ModelViewSet):
             student=child
         )
 
+        # Fetch quizzes with due dates in next 30 days with optimized queries
         quizzes = Quiz.objects.filter(
-            due_date__isnull=False
+            due_date__isnull=False,
+            due_date__gte=today,
+            due_date__lte=next_30_days
         ).filter(
             models.Q(learning_area__grade_level=child.grade_level) |
             models.Q(learning_area__students=child) |
             models.Q(lesson__module__learning_area__grade_level=child.grade_level) |
             models.Q(lesson__module__learning_area__students=child)
+        ).select_related(
+            'learning_area',
+            'lesson',
+            'lesson__module'
+        ).prefetch_related(
+            'questions'
         ).distinct().annotate(
             is_completed=Exists(qz_submissions)
         )

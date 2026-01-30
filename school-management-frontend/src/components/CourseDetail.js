@@ -54,7 +54,6 @@ const Sidebar = ({ activeTab, onChange, collapsed, onBack }) => {
         { id: 'assignments', label: 'Assignments', icon: ClipboardDocumentCheckIcon },
         { id: 'quizzes', label: 'Quizzes', icon: QuestionMarkCircleIcon },
         { id: 'submissions', label: 'My Performance', icon: ChartBarIcon },
-        { id: 'discussions', label: 'Class Forum', icon: ChatBubbleLeftRightIcon },
     ];
 
     return (
@@ -267,9 +266,6 @@ const CourseDetail = () => {
                                 <Bars3CenterLeftIcon className={`w-6 h-6 transition-transform ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
                             </button>
                             <div className="flex items-center gap-4">
-                                <div className="h-12 w-12 bg-white rounded-2xl flex items-center justify-center p-1.5 shadow-sm border border-slate-100">
-                                    <img src="/kianda-school-logo.png" alt="Kianda School" className="h-full object-contain" />
-                                </div>
                                 <div>
                                     <h1 className="text-2xl font-black text-[#18216D] tracking-tighter flex items-center leading-none">
                                         {course.name}
@@ -354,6 +350,11 @@ const CourseDetail = () => {
                                                                             <span>Sub-strand {lesson.order}</span>
                                                                             <span>•</span>
                                                                             <span className="flex items-center"><i className="far fa-clock mr-1" /> {lesson.duration_minutes} Mins</span>
+                                                                            {lesson.quizzes?.length > 0 && (
+                                                                                <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-600 text-[8px] font-black rounded-full animate-pulse">
+                                                                                    {lesson.quizzes.length} NEW QUIZ{lesson.quizzes.length > 1 ? 'ZES' : ''}
+                                                                                </span>
+                                                                            )}
                                                                         </div>
                                                                         <h4 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{lesson.title}</h4>
                                                                         <p className="text-sm font-medium text-gray-500 mt-1 line-clamp-1">{lesson.summary}</p>
@@ -390,7 +391,7 @@ const CourseDetail = () => {
                                                                                         <div>
                                                                                             <p className="font-bold text-gray-900">{quiz.title}</p>
                                                                                             <p className="text-[10px] font-black text-gray-400 uppercase mt-1">
-                                                                                                {quiz.questions.length} Items · {quiz.time_limit_minutes} Mins
+                                                                                                {quiz.questions.length} Items · {quiz.time_limit_minutes} Mins · Attempts: {(course.quiz_submissions || []).filter(s => s.quiz === quiz.id).length}/{quiz.max_attempts || 1}
                                                                                             </p>
                                                                                         </div>
                                                                                         <button

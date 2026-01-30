@@ -5,7 +5,7 @@ import { useApi } from '../../hooks/useApi';
 const ChildFinances = () => {
     const { childId } = useParams();
     const navigate = useNavigate();
-    const { get, post } = useApi();
+    const { get } = useApi();
     const [child, setChild] = useState(null);
     const [finances, setFinances] = useState({
         fees: [],
@@ -173,8 +173,8 @@ const ChildFinances = () => {
                                             </div>
                                         </div>
                                         <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${fee.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                fee.status === 'partial' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                    'bg-rose-50 text-rose-600 border-rose-100'
+                                            fee.status === 'partial' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                'bg-rose-50 text-rose-600 border-rose-100'
                                             }`}>
                                             Status: {fee.status}
                                         </span>
