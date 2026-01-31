@@ -152,7 +152,11 @@ const QuizTaker = ({ quiz, onClose, onComplete }) => {
     }
 
     return (
-        <div className="fixed inset-0 bg-[#18216D]/40 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div
+            className="fixed inset-0 bg-[#18216D]/40 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto select-none"
+            onContextMenu={(e) => e.preventDefault()}
+            onCopy={(e) => e.preventDefault()}
+        >
             <div className="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-white/20 animate-in zoom-in-95 duration-300">
                 {/* Header */}
                 <div className="bg-white border-b border-slate-50 px-10 py-6">

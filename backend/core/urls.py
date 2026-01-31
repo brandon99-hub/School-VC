@@ -16,7 +16,15 @@ from .views import (
     AcademicYearViewSet,
     AcademicTermViewSet
 )
-from courses.views import CourseViewSet, GradeViewSet, AssignmentViewSet, AssignmentSubmissionViewSet
+from courses.views import (
+    CourseViewSet, 
+    GradeViewSet, 
+    AssignmentViewSet, 
+    AssignmentSubmissionViewSet,
+    LessonViewSet,
+    LessonContentViewSet,
+    ModuleViewSet
+)
 from students.views import enroll_course
 
 router = DefaultRouter()
@@ -26,6 +34,9 @@ router.register(r'assignments', AssignmentViewSet)
 router.register(r'assignment-submissions', AssignmentSubmissionViewSet)
 router.register(r'grades', GradeViewSet)
 router.register(r'teachers', views.TeacherViewSet)
+router.register(r'modules', ModuleViewSet)
+router.register(r'lessons', LessonViewSet)
+router.register(r'lesson-contents', LessonContentViewSet)
 router.register(r'announcements', views.AnnouncementViewSet)
 router.register(r'academic-years', views.AcademicYearViewSet)
 router.register(r'academic-terms', views.AcademicTermViewSet)

@@ -184,9 +184,17 @@ def mark_student_attendance(request):
         status = request.POST.get('status')
 
         student = get_object_or_404(Student, id=student_id)
+        learning_area_id = request.POST.get('learning_area_id')
+        learning_area = get_object_or_404(LearningArea, id=learning_area_id)
+
+        # Permission check: teacher must be assigned to this area
+        if not (request.user.is_superuser or learning_area.teacher == request.user.teacher):
+            return JsonResponse({'status': 'error', 'message': 'Not assigned to this learning area'}, status=403)
+
         attendance, created = Attendance.objects.update_or_create(
             student=student,
             date=date,
+            learning_area=learning_area,
             defaults={'status': status}
         )
 
@@ -340,13 +348,23 @@ def assigned_courses_api(request):
             'submitted_at': q.submitted_at
         })
 
+    # 3. Get Managed Clubs
+    from events.models import Club
+    managed_clubs = Club.objects.filter(teacher=request.user.teacher)
+    clubs_data = [{
+        'id': club.id, 
+        'name': club.name, 
+        'member_count': club.members.count()
+    } for club in managed_clubs]
+
     # Sort all by most recent
     pending_actions.sort(key=lambda x: x['submitted_at'], reverse=True)
     
     return Response({
         'courses': serializer.data,
         'unique_student_count': unique_students,
-        'pending_actions': pending_actions[:5]
+        'pending_actions': pending_actions[:5],
+        'managed_clubs': clubs_data
     })
 
 @api_view(['GET'])
@@ -378,28 +396,28 @@ def teacher_class_attendance(request):
     
     teacher = request.user.teacher
     
-    # Get all courses taught by the teacher
-    courses = Course.objects.filter(teacher=teacher)
+    # Get all learning areas taught by the teacher
+    from cbc.models import LearningArea
+    areas = LearningArea.objects.filter(teacher=teacher)
     
-    # Aggregate attendance by course and date
+    # Aggregate attendance by learning area and date
     attendance_data = []
     
-    for course in courses:
-        students = course.enrolled_students.all()
+    for area in areas:
+        students = area.students.all()
         
-        # Get unique dates with attendance records for this course's students
+        # Get unique dates with attendance records for this area
         dates = Attendance.objects.filter(
-            student__in=students
+            learning_area=area
         ).values_list('date', flat=True).distinct().order_by('-date')
         
         for date in dates:
-            # Calculate attendance rate for this course on this date
             total_students = students.count()
             if total_students == 0:
                 continue
             
             present_count = Attendance.objects.filter(
-                student__in=students,
+                learning_area=area,
                 date=date,
                 status='Present'
             ).count()
@@ -407,8 +425,8 @@ def teacher_class_attendance(request):
             attendance_rate = round((present_count / total_students) * 100)
             
             attendance_data.append({
-                'id': f"{course.id}_{date}",
-                'course': course.name,
+                'id': f"{area.id}_{date}",
+                'learning_area': area.name,
                 'date': date.isoformat(),
                 'attendanceRate': attendance_rate
             })

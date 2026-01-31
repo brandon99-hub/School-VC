@@ -9,7 +9,7 @@ class StudentAdmin(admin.ModelAdmin):
     list_filter = ('grade', 'gender', 'date_joined')
     search_fields = ('student_id', 'user__first_name', 'user__last_name', 'phone')
     date_hierarchy = 'date_joined'
-    filter_horizontal = ('courses',)
+    filter_horizontal = ()
 
     def get_full_name(obj):
         return obj.get_full_name()
@@ -24,21 +24,21 @@ class StudentAdmin(admin.ModelAdmin):
             'fields': ('address', 'phone')
         }),
         ('Academic Information', {
-            'fields': ('grade', 'courses')
+            'fields': ('grade', 'grade_level', 'club', 'credit_balance')
         })
     )
 
 
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ('student', 'date', 'status')
-    list_filter = ('status', 'date')
+    list_display = ('student', 'learning_area', 'date', 'status')
+    list_filter = ('status', 'date', 'learning_area')
     search_fields = ('student__user__first_name', 'student__user__last_name', 'student__student_id')
     date_hierarchy = 'date'
 
     fieldsets = (
         (None, {
-            'fields': ('student', 'date', 'status', 'remarks')
+            'fields': ('student', 'learning_area', 'date', 'status', 'remarks')
         }),
     )
 

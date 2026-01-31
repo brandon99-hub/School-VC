@@ -57,7 +57,8 @@ class StudentFee(models.Model):
     ]
     
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='fees')
-    fee_structure = models.ForeignKey(FeeStructure, on_delete=models.CASCADE, related_name='student_fees')
+    fee_structure = models.ForeignKey(FeeStructure, on_delete=models.CASCADE, related_name='student_fees', null=True, blank=True)
+    event_notice = models.ForeignKey('events.EventNotice', on_delete=models.CASCADE, related_name='student_fees', null=True, blank=True)
     
     # Allow custom amounts (scholarships, special cases)
     custom_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -74,12 +75,19 @@ class StudentFee(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ['student', 'fee_structure']
         ordering = ['-created_at']
     
     def save(self, *args, **kwargs):
         # Calculate final amount
-        base_amount = self.custom_amount if self.custom_amount else self.fee_structure.total_amount
+        if self.custom_amount:
+            base_amount = self.custom_amount
+        elif self.event_notice:
+            base_amount = self.event_notice.cost
+        elif self.fee_structure:
+            base_amount = self.fee_structure.total_amount
+        else:
+            base_amount = 0
+            
         self.final_amount = base_amount - self.discount_amount
         
         # Calculate balance

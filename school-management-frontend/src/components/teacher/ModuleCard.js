@@ -155,6 +155,7 @@ const ModuleCard = ({ module, onEdit, onDelete, onTogglePublish, onRefresh }) =>
                                         onDelete={handleDeleteLesson}
                                         onTogglePublish={handleToggleLessonPublish}
                                         onManageContent={handleManageContent}
+                                        onRefresh={onRefresh}
                                     />
                                 ))}
                             </div>

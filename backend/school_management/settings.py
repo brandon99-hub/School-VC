@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'courses.apps.CoursesConfig',
     'cbc.apps.CbcConfig',  # CBC (Competency-Based Curriculum)
     'finance.apps.FinanceConfig',  # Finance Management
+    'events.apps.EventsConfig',  # Schools Events and Clubs
 ]
 
 MIDDLEWARE = [

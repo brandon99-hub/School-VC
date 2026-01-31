@@ -15,7 +15,7 @@ import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/sol
 
 const ParentDashboard = () => {
     const navigate = useNavigate();
-    const { get } = useApi();
+    const { get, post } = useApi();
     const [parent, setParent] = useState(null);
     const [selectedChild, setSelectedChild] = useState(null);
     const [childActivities, setChildActivities] = useState(null);
@@ -24,6 +24,20 @@ const ParentDashboard = () => {
     const [childMetrics, setChildMetrics] = useState(null);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
+
+    const handlePayEventFee = async (event) => {
+        try {
+            await post('/api/events/pay-fee/', {
+                student_id: selectedChild.id,
+                event_id: event.id
+            });
+            alert(`Fee for ${event.title} has been processed. A fee record for KES ${event.cost} has been created.`);
+            fetchChildData(); // Refresh finances
+        } catch (error) {
+            console.error('Error paying event fee:', error);
+            alert('Could not process payment. Please try again or contact administration.');
+        }
+    };
 
     const fetchParentData = useCallback(async () => {
         try {
@@ -99,12 +113,18 @@ const ParentDashboard = () => {
 
         const allEvents = [
             ...(childCalendarData.assignments || []).map(a => ({ ...a, type: 'Assignment' })),
-            ...(childCalendarData.quizzes || []).map(q => ({ ...q, type: 'Quiz' }))
+            ...(childCalendarData.quizzes || []).map(q => ({ ...q, type: 'Quiz' })),
+            ...(childCalendarData.events || []).map(e => ({
+                ...e,
+                type: 'School Event',
+                due_date: e.start_date,
+                is_event: true
+            }))
         ];
 
         allEvents.forEach(ev => {
             if (ev.due_date) {
-                // Parse due date strings robustly using string split
+                // Parse due date strings robustly matching YYYY-MM-DD
                 const datePart = ev.due_date.split('T')[0];
                 if (!dates[datePart]) dates[datePart] = [];
                 dates[datePart].push(ev);
@@ -210,14 +230,14 @@ const ParentDashboard = () => {
                                 Competency Matrix Summary
                             </h3>
                             {childMetrics ? (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div className="flex md:grid md:grid-cols-4 gap-6 overflow-x-auto pb-4 md:pb-0 scrollbar-hide snap-x">
                                     {[
                                         { label: 'Exceeding Expectation', val: childMetrics.by_level?.EE || 0, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: 'fa-crown' },
                                         { label: 'Meeting Expectation', val: childMetrics.by_level?.ME || 0, color: 'text-blue-600', bg: 'bg-blue-50', icon: 'fa-check-double' },
                                         { label: 'Approaching Expectation', val: childMetrics.by_level?.AE || 0, color: 'text-amber-600', bg: 'bg-amber-50', icon: 'fa-shoe-prints' },
                                         { label: 'Below Expectation', val: childMetrics.by_level?.BE || 0, color: 'text-rose-600', bg: 'bg-rose-50', icon: 'fa-triangle-exclamation' },
                                     ].map((stat, i) => (
-                                        <div key={i} className={`${stat.bg} p-6 rounded-[2rem] border border-transparent hover:border-slate-200 transition-all text-center group`}>
+                                        <div key={i} className={`${stat.bg} p-6 rounded-[2rem] border border-transparent hover:border-slate-200 transition-all text-center group min-w-[160px] md:min-w-0 snap-center`}>
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="h-8 w-8 bg-white/80 rounded-xl flex items-center justify-center shadow-sm">
                                                     <i className={`fas ${stat.icon} ${stat.color} text-xs`}></i>
@@ -428,11 +448,12 @@ const ParentDashboard = () => {
                                     {childActivities ? (
                                         [
                                             ...(childActivities.assignments || []).map(a => ({ ...a, type: 'Assignment' })),
-                                            ...(childActivities.quizzes || []).map(q => ({ ...q, type: 'Quiz' }))
-                                        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10).map((item, idx) => (
+                                            ...(childActivities.quizzes || []).map(q => ({ ...q, type: 'Quiz' })),
+                                            ...(childActivities.events || []).map(e => ({ ...e, type: 'School Event', is_event: true }))
+                                        ].sort((a, b) => new Date(b.created_at || b.start_date) - new Date(a.created_at || a.start_date)).slice(0, 10).map((item, idx) => (
                                             <div key={idx} className="flex gap-4 items-start p-4 hover:bg-slate-50 transition-all rounded-2xl group/act">
-                                                <div className={`mt-1 h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all group-hover/act:scale-110 shadow-sm ${item.type === 'Quiz' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                    {item.type === 'Quiz' ? <AcademicCapIcon className="w-6 h-6" /> : <ChartBarIcon className="w-6 h-6" />}
+                                                <div className={`mt-1 h-12 w-12 flex-shrink-0 rounded-xl flex items-center justify-center transition-all group-hover/act:scale-110 shadow-sm ${item.type === 'Quiz' ? 'bg-amber-50 text-amber-600' : (item.is_event ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600')}`}>
+                                                    {item.type === 'Quiz' ? <AcademicCapIcon className="w-6 h-6" /> : (item.is_event ? <CalendarIcon className="w-6 h-6" /> : <ChartBarIcon className="w-6 h-6" />)}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center justify-between mb-1">
@@ -440,7 +461,7 @@ const ParentDashboard = () => {
                                                             {item.type}
                                                             {item.is_completed && <CheckCircleIconSolid className="w-3 h-3 text-emerald-500" />}
                                                         </span>
-                                                        <span className="text-[9px] font-black text-slate-300 uppercase">{new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                                                        <span className="text-[9px] font-black text-slate-300 uppercase">{new Date(item.created_at || item.start_date).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                                                     </div>
                                                     <h4 className="font-bold text-[#18216D] text-sm truncate leading-tight">
                                                         {item.title}
@@ -452,6 +473,17 @@ const ParentDashboard = () => {
                                                             </span>
                                                         )}
                                                         {item.is_completed && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Status: Completed</span>}
+                                                        {item.is_event && item.cost > 0 && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handlePayEventFee(item);
+                                                                }}
+                                                                className="text-[8px] font-black uppercase tracking-widest bg-emerald-600 text-white px-2 py-1 rounded shadow-sm hover:scale-105 active:scale-95 transition-all"
+                                                            >
+                                                                Pay Fee (KES {item.cost})
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

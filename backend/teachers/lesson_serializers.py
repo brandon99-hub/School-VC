@@ -1,18 +1,20 @@
 from rest_framework import serializers
-from courses.models import Lesson
+from courses.models import Lesson, LessonContent
+
+
+class LessonContentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LessonContent
+        fields = '__all__'
 
 
 class LessonSerializer(serializers.ModelSerializer):
-    contents = serializers.SerializerMethodField()
+    contents = LessonContentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Lesson
         fields = ['id', 'module', 'title', 'summary', 'order', 'duration_minutes', 'is_published', 'release_date', 'contents']
         read_only_fields = ['id']
-
-    def get_contents(self, obj):
-        # Return basic content count for now (Week 6 will expand this)
-        return []
 
 
 class LessonCreateUpdateSerializer(serializers.ModelSerializer):

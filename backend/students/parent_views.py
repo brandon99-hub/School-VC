@@ -26,6 +26,8 @@ from finance.models import StudentFee, Payment, Invoice, FeeStructure
 from finance.serializers import StudentFeeSerializer, PaymentSerializer, InvoiceSerializer, FeeStructureSerializer
 from courses.models import Assignment, Quiz, AssignmentSubmission, QuizSubmission
 from courses.serializers import AssignmentSerializer, QuizSerializer
+from events.models import EventNotice
+from events.serializers import EventNoticeSerializer
 
 
 @api_view(['POST'])
@@ -391,9 +393,17 @@ class ParentViewSet(viewsets.ModelViewSet):
         for i, q in enumerate(quizzes):
             quiz_data[i]['is_completed'] = q.is_completed
 
+        # Get relevant events (Targeting school-wide, grade, or club)
+        events = EventNotice.objects.filter(
+            models.Q(target_type='all') |
+            models.Q(target_type='grades', target_grades=child.grade_level) |
+            models.Q(target_type='clubs', target_clubs=child.club)
+        ).distinct().order_by('-start_date')[:5]
+
         return Response({
             'assignments': asgn_data,
-            'quizzes': quiz_data
+            'quizzes': quiz_data,
+            'events': EventNoticeSerializer(events, many=True).data
         })
 
     @action(detail=False, methods=['get'], url_path='child-calendar/(?P<child_id>[^/.]+)')
@@ -475,7 +485,18 @@ class ParentViewSet(viewsets.ModelViewSet):
         for i, q in enumerate(quizzes):
             quiz_data[i]['is_completed'] = q.is_completed
 
+        # Fetch events for calendar
+        events = EventNotice.objects.filter(
+            start_date__lte=next_30_days,
+            end_date__gte=today
+        ).filter(
+            models.Q(target_type='all') |
+            models.Q(target_type='grades', target_grades=child.grade_level) |
+            models.Q(target_type='clubs', target_clubs=child.club)
+        ).distinct()
+
         return Response({
             'assignments': asgn_data,
-            'quizzes': quiz_data
+            'quizzes': quiz_data,
+            'events': EventNoticeSerializer(events, many=True).data
         })

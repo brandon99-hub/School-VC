@@ -10,12 +10,12 @@ import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import Contact from './components/contact/Contact';
 import Navbar from './components/common/Navbar';
+import BottomNav from './components/common/BottomNav';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import CourseDetail from './components/CourseDetail';
 import ProfilePage from './components/ProfilePage';
 import CourseList from './components/CourseList';
 import AttendanceRecord from './components/AttendanceRecord';
-import TeacherAttendanceRecord from './components/TeacherAttendanceRecord';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import TeacherCourseList from './pages/teacher/TeacherCourseList';
 import TeacherCourseView from './pages/teacher/TeacherCourseView';
@@ -24,6 +24,8 @@ import BulkGrading from './components/teacher/BulkGrading';
 import ParentDashboard from './pages/parent/ParentDashboard';
 import ChildFinances from './pages/parent/ChildFinances';
 import SubmissionListPage from './pages/teacher/SubmissionListPage';
+import GlobalAttendanceManager from './pages/teacher/GlobalAttendanceManager';
+import GlobalSubmissionManager from './pages/teacher/GlobalSubmissionManager';
 import SuccessHub from './components/student/SuccessHub';
 import ParentReport from './pages/parent/ParentReport';
 
@@ -88,7 +90,7 @@ function App() {
 
     return (
         <Router>
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
                 <Navbar />
                 <Routes>
                     <Route
@@ -219,14 +221,20 @@ function App() {
                     <Route
                         path="/teacher-attendance"
                         element={
-                            isAuthenticated ? (
-                                user?.role === 'teacher' ? (
-                                    <TeacherAttendanceRecord />
-                                ) : (
-                                    <Navigate to="/dashboard" replace />
-                                )
+                            isAuthenticated && user?.role === 'teacher' ? (
+                                <GlobalAttendanceManager />
                             ) : (
-                                <Navigate to="/login" replace />
+                                <Navigate to="/dashboard" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="/teacher-submissions"
+                        element={
+                            isAuthenticated && user?.role === 'teacher' ? (
+                                <GlobalSubmissionManager />
+                            ) : (
+                                <Navigate to="/dashboard" replace />
                             )
                         }
                     />
@@ -285,6 +293,7 @@ function App() {
                         element={<Navigate to={isAuthenticated ? (user?.role === 'admin' ? '/admin/dashboard' : '/dashboard') : '/login'} replace />}
                     />
                 </Routes>
+                <BottomNav />
                 <ToastContainer />
             </div>
         </Router>

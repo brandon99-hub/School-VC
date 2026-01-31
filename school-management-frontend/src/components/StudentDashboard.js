@@ -96,35 +96,44 @@ const StudentDashboard = () => {
                     </div>
                 </header>
 
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <StatCard
-                        label="Learning Areas"
-                        value={overview.totalCourses}
-                        delta="Academic Subjects"
-                        trend="up"
-                        icon={BookOpenIcon}
-                    />
-                    <StatCard
-                        label="Assignments"
-                        value={overview.totalAssignments}
-                        delta={`${overview.completedAssignments} Done`}
-                        trend="up"
-                        icon={AcademicCapIcon}
-                    />
-                    <StatCard
-                        label="Quizzes"
-                        value={overview.totalQuizzes}
-                        delta={`${overview.completedQuizzes} Done`}
-                        trend="up"
-                        icon={ClockIcon}
-                    />
+                <section className="flex md:grid md:grid-cols-3 gap-6 overflow-x-auto pb-4 md:pb-0 scrollbar-hide snap-x">
+                    <div className="min-w-[85%] md:min-w-0 snap-center">
+                        <StatCard
+                            label="Learning Areas"
+                            value={overview.totalCourses}
+                            delta="Academic Subjects"
+                            trend="up"
+                            icon={BookOpenIcon}
+                        />
+                    </div>
+                    <div className="min-w-[85%] md:min-w-0 snap-center">
+                        <StatCard
+                            label="Assignments"
+                            value={overview.totalAssignments}
+                            delta={`${overview.completedAssignments} Done`}
+                            trend="up"
+                            icon={AcademicCapIcon}
+                        />
+                    </div>
+                    <div className="min-w-[85%] md:min-w-0 snap-center">
+                        <StatCard
+                            label="Quizzes"
+                            value={overview.totalQuizzes}
+                            delta={`${overview.completedQuizzes} Done`}
+                            trend="up"
+                            icon={ClockIcon}
+                        />
+                    </div>
                 </section>
 
                 <section className="grid grid-cols-1 lg:grid-cols-10 gap-8">
-                    <div className="lg:col-span-3">
+                    <div className="hidden lg:block lg:col-span-3">
                         <StudentInfo student={user} />
                     </div>
-                    <div className="lg:col-span-7">
+                    <div className="lg:col-span-10 lg:hidden block">
+                        <CourseList />
+                    </div>
+                    <div className="hidden lg:block lg:col-span-7">
                         <CourseList />
                     </div>
                 </section>

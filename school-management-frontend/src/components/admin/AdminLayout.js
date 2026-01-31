@@ -18,7 +18,9 @@ const AdminLayout = ({ children }) => {
         { path: '/admin', label: 'Dashboard', icon: 'fa-gauge-high' },
         { path: '/admin/courses', label: 'Learning Areas', icon: 'fa-book' },
         { path: '/admin/curriculum', label: 'Curriculum', icon: 'fa-sitemap' },
+        { path: '/admin/events', label: 'Events', icon: 'fa-calendar-check' },
         { path: '/admin/finance', label: 'Finance', icon: 'fa-wallet' },
+        { path: '/admin/clubs', label: 'Clubs', icon: 'fa-users' },
         { path: '/admin/users', label: 'Users', icon: 'fa-users-gear' },
     ];
 

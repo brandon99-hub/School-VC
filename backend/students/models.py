@@ -35,6 +35,15 @@ class Student(AbstractUser):
     )
     # Legacy M2M kept for backwards compatibility. Active enrollment should
     # use Course.students -> Student.enrolled_courses reverse relation.
+    club = models.ForeignKey(
+        'events.Club', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='members'
+    )
+    # Legacy M2M kept for backwards compatibility. Active enrollment should
+    # use Course.students -> Student.enrolled_courses reverse relation.
     courses = models.ManyToManyField('courses.Course', related_name='enrolled_students', blank=True)
     credit_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Carried forward overpayments")
     date_joined = models.DateField(auto_now_add=True)
@@ -90,12 +99,18 @@ class Attendance(models.Model):
         ('Late', 'Late')
     ]
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='student_attendance')
+    learning_area = models.ForeignKey(
+        'cbc.LearningArea', 
+        on_delete=models.CASCADE, 
+        related_name='attendance_records',
+        null=True,
+        blank=True
+    )
     date = models.DateField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     remarks = models.TextField(blank=True, null=True)
 
     class Meta:
-        unique_together = ['student', 'date']
         ordering = ['-date']
 
     def __str__(self):

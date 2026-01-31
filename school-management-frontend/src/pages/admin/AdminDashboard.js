@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../components/admin/AdminLayout';
 import CourseList from './CourseList';
 import CourseForm from './CourseForm';
@@ -9,10 +9,14 @@ import FinanceOverview from '../../components/admin/FinanceOverview';
 import FeeManagement from './FeeManagement';
 import PaymentRecording from './PaymentRecording';
 import CurriculumRegistry from './CurriculumRegistry';
+import ClubList from './ClubList';
+import EventList from './EventList';
 import { useApi } from '../../hooks/useApi';
 import UserRegistrationModal from '../../components/admin/UserRegistrationModal';
 import FeeFrameworkModal from '../../components/admin/FeeFrameworkModal';
 import AcademicCycleModal from '../../components/admin/AcademicCycleModal';
+import ClubModal from '../../components/admin/ClubModal';
+import EventNoticeModal from '../../components/admin/EventNoticeModal';
 
 const StatCard = ({ title, value, icon, color, link }) => (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 hover:shadow-lg transition-all group">
@@ -35,6 +39,7 @@ const StatCard = ({ title, value, icon, color, link }) => (
 
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const { get } = useApi();
     const [stats, setStats] = useState({
         totalLearningAreas: 0,
@@ -46,26 +51,28 @@ const Dashboard = () => {
     const [showUserModal, setShowUserModal] = useState(false);
     const [showFeeModal, setShowFeeModal] = useState(false);
     const [showCycleModal, setShowCycleModal] = useState(false);
+    const [showClubModal, setShowClubModal] = useState(false);
+    const [showEventModal, setShowEventModal] = useState(false);
+
+    const fetchStats = useCallback(async () => {
+        try {
+            const data = await get('/api/admin/stats/');
+            setStats({
+                totalLearningAreas: data.totalLearningAreas || 0,
+                totalStrands: data.totalStrands || 0,
+                totalTeachers: data.totalTeachers || 0,
+                totalStudents: data.totalStudents || 0
+            });
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [get]);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const data = await get('/api/admin/stats/');
-                setStats({
-                    totalLearningAreas: data.totalLearningAreas || 0,
-                    totalStrands: data.totalStrands || 0,
-                    totalTeachers: data.totalTeachers || 0,
-                    totalStudents: data.totalStudents || 0
-                });
-            } catch (error) {
-                console.error('Error fetching stats:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchStats();
-    }, [get]);
+    }, [fetchStats]);
 
     if (loading) {
         return (
@@ -87,35 +94,43 @@ const Dashboard = () => {
             </header>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="National Learning Areas"
-                    value={stats.totalLearningAreas}
-                    icon={<i className="fas fa-book-open"></i>}
-                    color="text-[#18216D]"
-                    link="/admin/curriculum"
-                />
-                <StatCard
-                    title="Curriculum Strands"
-                    value={stats.totalStrands}
-                    icon={<i className="fas fa-layer-group"></i>}
-                    color="text-[#FFC425]"
-                    link="/admin/curriculum"
-                />
-                <StatCard
-                    title="Faculty Experts"
-                    value={stats.totalTeachers}
-                    icon={<i className="fas fa-chalkboard-user"></i>}
-                    color="text-indigo-400"
-                    link="/admin/users"
-                />
-                <StatCard
-                    title="Enrolled Scholars"
-                    value={stats.totalStudents}
-                    icon={<i className="fas fa-user-graduate"></i>}
-                    color="text-slate-400"
-                    link="/admin/users"
-                />
+            <div className="flex md:grid md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-x-auto pb-6 md:pb-0 scrollbar-hide snap-x">
+                <div className="min-w-[85%] md:min-w-0 snap-center">
+                    <StatCard
+                        title="National Learning Areas"
+                        value={stats.totalLearningAreas}
+                        icon={<i className="fas fa-book-open"></i>}
+                        color="text-[#18216D]"
+                        link="/admin/curriculum"
+                    />
+                </div>
+                <div className="min-w-[85%] md:min-w-0 snap-center">
+                    <StatCard
+                        title="Curriculum Strands"
+                        value={stats.totalStrands}
+                        icon={<i className="fas fa-layer-group"></i>}
+                        color="text-[#FFC425]"
+                        link="/admin/curriculum"
+                    />
+                </div>
+                <div className="min-w-[85%] md:min-w-0 snap-center">
+                    <StatCard
+                        title="Faculty Experts"
+                        value={stats.totalTeachers}
+                        icon={<i className="fas fa-chalkboard-user"></i>}
+                        color="text-indigo-400"
+                        link="/admin/users"
+                    />
+                </div>
+                <div className="min-w-[85%] md:min-w-0 snap-center">
+                    <StatCard
+                        title="Enrolled Scholars"
+                        value={stats.totalStudents}
+                        icon={<i className="fas fa-user-graduate"></i>}
+                        color="text-slate-400"
+                        link="/admin/users"
+                    />
+                </div>
             </div>
 
             {/* Quick Actions */}
@@ -162,6 +177,32 @@ const Dashboard = () => {
                             <p className="text-[10px] font-bold text-slate-400 mt-1">Manage Years & Termly Sessions</p>
                         </div>
                     </button>
+
+                    <button
+                        onClick={() => setShowClubModal(true)}
+                        className="flex items-center space-x-6 p-6 bg-slate-50/50 border border-slate-100 rounded-[2rem] hover:border-indigo-500/20 hover:bg-white hover:shadow-xl hover:shadow-indigo-900/5 transition-all group text-left"
+                    >
+                        <span className="h-14 w-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110 shadow-sm border border-white">
+                            <i className="fas fa-users"></i>
+                        </span>
+                        <div>
+                            <p className="font-extrabold text-[#18216D] uppercase text-xs tracking-widest">Manage Clubs</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">Extra-curricular Governance</p>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => setShowEventModal(true)}
+                        className="flex items-center space-x-6 p-6 bg-slate-50/50 border border-slate-100 rounded-[2rem] hover:border-rose-500/20 hover:bg-white hover:shadow-xl hover:shadow-rose-900/5 transition-all group text-left"
+                    >
+                        <span className="h-14 w-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl transition-transform group-hover:scale-110 shadow-sm border border-white">
+                            <i className="fas fa-calendar-check"></i>
+                        </span>
+                        <div>
+                            <p className="font-extrabold text-[#18216D] uppercase text-xs tracking-widest">Manage Notices</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1">Deploy School-wide Alerts</p>
+                        </div>
+                    </button>
                 </div>
             </div>
 
@@ -169,6 +210,8 @@ const Dashboard = () => {
             {showUserModal && <UserRegistrationModal onClose={() => setShowUserModal(false)} />}
             {showFeeModal && <FeeFrameworkModal onClose={() => setShowFeeModal(false)} />}
             {showCycleModal && <AcademicCycleModal onClose={() => setShowCycleModal(false)} />}
+            {showClubModal && <ClubModal onClose={() => setShowClubModal(false)} onSuccess={fetchStats} />}
+            {showEventModal && <EventNoticeModal onClose={() => setShowEventModal(false)} onSuccess={fetchStats} />}
 
             {/* Finance Overview */}
             <FinanceOverview />
@@ -193,6 +236,8 @@ const AdminDashboard = () => {
                 <Route path="/finance" element={<FeeManagement />} />
                 <Route path="/finance/record-payment" element={<PaymentRecording />} />
                 <Route path="/curriculum" element={<CurriculumRegistry />} />
+                <Route path="/clubs" element={<ClubList />} />
+                <Route path="/events" element={<EventList />} />
             </Routes>
         </AdminLayout>
     );

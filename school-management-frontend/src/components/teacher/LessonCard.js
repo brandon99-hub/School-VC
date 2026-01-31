@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ContentManager from './ContentManager';
 
-const LessonCard = ({ lesson, onEdit, onDelete, onTogglePublish }) => {
+const LessonCard = ({ lesson, onEdit, onDelete, onTogglePublish, onRefresh }) => {
     const [showContentManager, setShowContentManager] = useState(false);
 
     const handleManageContent = () => {
@@ -85,6 +85,7 @@ const LessonCard = ({ lesson, onEdit, onDelete, onTogglePublish }) => {
                 <ContentManager
                     lesson={lesson}
                     onClose={() => setShowContentManager(false)}
+                    onSave={onRefresh}
                 />
             )}
         </div>

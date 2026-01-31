@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAppState } from '../context/AppStateContext';
 import GradeForm from './GradeForm';
 import TeacherInfo from './TeacherInfo';
+import ClubMemberManager from './teacher/ClubMemberManager';
 import {
     ClipboardDocumentCheckIcon,
     UserGroupIcon,
@@ -148,7 +149,7 @@ const SubmissionDetailModal = ({ courses, onClose }) => {
 const TeacherDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
-    const { courses, uniqueStudentCount, pendingActions, loading, error, refresh } = useAppState();
+    const { courses, uniqueStudentCount, pendingActions, managed_clubs, loading, error, refresh } = useAppState();
     const [selectedAssignment, setSelectedAssignment] = useState(null);
     const [showSubmissionsModal, setShowSubmissionsModal] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -227,20 +228,28 @@ const TeacherDashboard = () => {
                     </div>
                 </header>
 
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatCard label="Learning Areas" value={overview.learningAreas} icon={BookOpenIcon} />
-                    <StatCard label="Total Students" value={overview.students} icon={UserGroupIcon} />
-                    <StatCard
-                        label="Total Submissions"
-                        value={overview.submissions}
-                        icon={ClipboardDocumentCheckIcon}
-                        badge={`${overview.gradedAssignments} Graded`}
-                        onClick={() => setShowSubmissionsModal(true)}
-                    />
+                <section className="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto pb-4 md:pb-0 scrollbar-hide snap-x">
+                    <div className="min-w-[85%] md:min-w-0 snap-center">
+                        <StatCard label="Learning Areas" value={overview.learningAreas} icon={BookOpenIcon} />
+                    </div>
+                    <div className="min-w-[85%] md:min-w-0 snap-center">
+                        <StatCard label="Total Students" value={overview.students} icon={UserGroupIcon} />
+                    </div>
+                    <div className="min-w-[85%] md:min-w-0 snap-center">
+                        <StatCard
+                            label="Total Submissions"
+                            value={overview.submissions}
+                            icon={ClipboardDocumentCheckIcon}
+                            badge={`${overview.gradedAssignments} Graded`}
+                            onClick={() => setShowSubmissionsModal(true)}
+                        />
+                    </div>
                 </section>
 
                 <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <TeacherInfo />
+                    <div className="hidden lg:block lg:col-span-1">
+                        <TeacherInfo />
+                    </div>
                     <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div>
@@ -497,6 +506,19 @@ const TeacherDashboard = () => {
                             <GradeForm assignmentId={selectedAssignment} onClose={() => setSelectedAssignment(null)} />
                         </div>
                     </div>
+                )}
+
+                {/* Club Management Section */}
+                {managed_clubs && managed_clubs.length > 0 && (
+                    <section className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-slate-100">
+                        <div className="p-8 border-b border-slate-50 mb-8">
+                            <h3 className="text-2xl font-black text-[#18216D] uppercase tracking-tight">Club Administration</h3>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Manage your extra-curricular groups</p>
+                        </div>
+                        {managed_clubs.map(club => (
+                            <ClubMemberManager key={club.id} clubId={club.id} clubName={club.name} />
+                        ))}
+                    </section>
                 )}
 
                 {showSubmissionsModal && (

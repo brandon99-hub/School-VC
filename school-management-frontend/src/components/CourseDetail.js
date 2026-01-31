@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
-import { generateAssignmentPDF } from '../utils/pdfGenerator';
+import { generateAssignmentPDF, generateLessonContentPDF } from '../utils/pdfGenerator';
 import AssignmentSubmission from './student/AssignmentSubmission';
 import QuizTaker from './student/QuizTaker';
 import {
@@ -9,9 +9,11 @@ import {
     BookOpenIcon,
     ClipboardDocumentCheckIcon,
     QuestionMarkCircleIcon,
-    ChatBubbleLeftRightIcon,
     ArrowLeftCircleIcon,
-    Bars3CenterLeftIcon
+    Bars3CenterLeftIcon,
+    ArrowDownTrayIcon,
+    ClipboardDocumentListIcon,
+    AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import {
     ResponsiveContainer,
@@ -108,12 +110,24 @@ const CourseDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('journey');
+
+    useEffect(() => {
+        const handleTabChange = (e) => {
+            if (e.detail) {
+                setActiveTab(e.detail);
+            }
+        };
+        window.addEventListener('change-course-tab', handleTabChange);
+        return () => window.removeEventListener('change-course-tab', handleTabChange);
+    }, []);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [expandedModule, setExpandedModule] = useState(null);
     const [expandedLesson, setExpandedLesson] = useState(null);
     const [submissionView, setSubmissionView] = useState('chart');
     const [submittingAssignment, setSubmittingAssignment] = useState(null);
     const [takingQuiz, setTakingQuiz] = useState(null);
+    const [lessonActiveTab, setLessonActiveTab] = useState({}); // { [lessonId]: 'materials' | 'requirements' }
+    const [expandedBlocks, setExpandedBlocks] = useState({}); // { [blockId]: boolean }
 
     const learningSummary = useMemo(() => course?.learning_summary || {}, [course]);
     const studentProgress = useMemo(() => course?.student_progress || {}, [course]);
@@ -346,13 +360,19 @@ const CourseDetail = () => {
                                                                     onClick={() => setExpandedLesson((prev) => (prev === lesson.id ? null : lesson.id))}
                                                                 >
                                                                     <div className="flex-1">
-                                                                        <div className="flex items-center space-x-3 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                                                                        <div className="flex items-center space-x-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                                                             <span>Sub-strand {lesson.order}</span>
-                                                                            <span>•</span>
-                                                                            <span className="flex items-center"><i className="far fa-clock mr-1" /> {lesson.duration_minutes} Mins</span>
+                                                                            <span className="flex items-center gap-1 bg-indigo-50 text-indigo-500 px-2 py-1 rounded-md">
+                                                                                <i className="fas fa-bullseye" /> {lesson.outcomes_count || 0} Outcomes
+                                                                            </span>
+                                                                            {lesson.content_count > 0 && (
+                                                                                <span className="flex items-center gap-1 bg-amber-50 text-amber-500 px-2 py-1 rounded-md">
+                                                                                    <i className="fas fa-book-open" /> {lesson.content_count} Materials
+                                                                                </span>
+                                                                            )}
                                                                             {lesson.quizzes?.length > 0 && (
-                                                                                <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-600 text-[8px] font-black rounded-full animate-pulse">
-                                                                                    {lesson.quizzes.length} NEW QUIZ{lesson.quizzes.length > 1 ? 'ZES' : ''}
+                                                                                <span className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md">
+                                                                                    <i className="fas fa-poll" /> {(lesson.quizzes || []).length} Quiz
                                                                                 </span>
                                                                             )}
                                                                         </div>
@@ -364,42 +384,133 @@ const CourseDetail = () => {
 
                                                                 {expandedLesson === lesson.id && (
                                                                     <div className="mt-4 ml-6 pl-6 border-l-2 border-dashed border-gray-100 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                                                                        {lesson.contents?.map((content) => (
-                                                                            <div
-                                                                                key={content.id}
-                                                                                className="flex items-start bg-white border border-gray-100 rounded-2xl p-5 hover:border-blue-200 hover:shadow-sm transition-all relative overflow-hidden group/content"
+                                                                        {/* Mini Tabs */}
+                                                                        <div className="flex gap-4 border-b border-gray-100 mb-6">
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); setLessonActiveTab(prev => ({ ...prev, [lesson.id]: 'materials' })); }}
+                                                                                className={`pb-2 px-1 text-[10px] font-black uppercase tracking-widest transition-all relative ${(!lessonActiveTab[lesson.id] || lessonActiveTab[lesson.id] === 'materials') ? 'text-[#18216D]' : 'text-gray-400 hover:text-gray-600'}`}
                                                                             >
-                                                                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover/content:opacity-100 transition-opacity"></div>
-                                                                                <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center mr-4 flex-shrink-0 group-hover/content:bg-blue-50 transition-colors">
-                                                                                    {renderContentIcon(content.content_type)}
-                                                                                </div>
-                                                                                <div className="flex-1 min-w-0">
-                                                                                    <p className="font-bold text-gray-900 group-hover/content:text-blue-600 transition-colors">{content.title}</p>
-                                                                                    {content.body && <p className="text-sm font-medium text-gray-500 mt-1 leading-relaxed">{content.body}</p>}
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
+                                                                                <span className="flex items-center gap-2">
+                                                                                    <i className="fas fa-book-open" />
+                                                                                    Learning Materials
+                                                                                </span>
+                                                                                {(!lessonActiveTab[lesson.id] || lessonActiveTab[lesson.id] === 'materials') && (
+                                                                                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#18216D] rounded-full"></div>
+                                                                                )}
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); setLessonActiveTab(prev => ({ ...prev, [lesson.id]: 'requirements' })); }}
+                                                                                className={`pb-2 px-1 text-[10px] font-black uppercase tracking-widest transition-all relative ${lessonActiveTab[lesson.id] === 'requirements' ? 'text-[#18216D]' : 'text-gray-400 hover:text-gray-600'}`}
+                                                                            >
+                                                                                <span className="flex items-center gap-2">
+                                                                                    <i className="fas fa-list-check" />
+                                                                                    Curriculum Requirements
+                                                                                </span>
+                                                                                {lessonActiveTab[lesson.id] === 'requirements' && (
+                                                                                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#18216D] rounded-full"></div>
+                                                                                )}
+                                                                            </button>
+                                                                        </div>
 
-                                                                        {lesson.quizzes?.length > 0 && (
-                                                                            <div className="bg-amber-50/30 rounded-2xl border border-amber-100 p-6 space-y-4">
-                                                                                <div className="flex items-center space-x-2 text-[10px] font-black text-amber-600 uppercase tracking-widest">
-                                                                                    <i className="fas fa-poll" />
-                                                                                    <span>Available Assessments</span>
-                                                                                </div>
-                                                                                {lesson.quizzes.map((quiz) => (
-                                                                                    <div key={quiz.id} className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm">
-                                                                                        <div>
-                                                                                            <p className="font-bold text-gray-900">{quiz.title}</p>
-                                                                                            <p className="text-[10px] font-black text-gray-400 uppercase mt-1">
-                                                                                                {quiz.questions.length} Items · {quiz.time_limit_minutes} Mins · Attempts: {(course.quiz_submissions || []).filter(s => s.quiz === quiz.id).length}/{quiz.max_attempts || 1}
-                                                                                            </p>
-                                                                                        </div>
-                                                                                        <button
-                                                                                            onClick={() => setTakingQuiz(quiz)}
-                                                                                            className="px-6 py-2.5 bg-amber-500 text-white text-xs font-black rounded-xl hover:bg-amber-600 shadow-lg shadow-amber-500/20 transition-all uppercase tracking-widest"
+                                                                        {/* Tab Content: Materials */}
+                                                                        {(!lessonActiveTab[lesson.id] || lessonActiveTab[lesson.id] === 'materials') && (
+                                                                            <div className="space-y-4 animate-in fade-in duration-300">
+                                                                                {(lesson.teacher_contents || []).length > 0 ? (
+                                                                                    lesson.teacher_contents.map((content) => (
+                                                                                        <div
+                                                                                            key={content.id}
+                                                                                            className="flex items-start bg-white border border-gray-100 rounded-2xl p-5 hover:border-blue-200 hover:shadow-sm transition-all relative overflow-hidden group/content"
                                                                                         >
-                                                                                            Start
-                                                                                        </button>
+                                                                                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover/content:opacity-100 transition-opacity"></div>
+                                                                                            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center mr-4 flex-shrink-0 group-hover/content:bg-blue-50 transition-colors">
+                                                                                                {renderContentIcon(content.content_type)}
+                                                                                            </div>
+                                                                                            <div className="flex-1 min-w-0">
+                                                                                                <div className="flex items-center justify-between">
+                                                                                                    <p className="font-bold text-gray-900 group-hover/content:text-blue-600 transition-colors">{content.title}</p>
+                                                                                                    {content.content_type === 'text' && (
+                                                                                                        <button
+                                                                                                            onClick={(e) => { e.stopPropagation(); generateLessonContentPDF(content, lesson.title); }}
+                                                                                                            className="p-2 hover:bg-blue-100 rounded-lg text-blue-500 transition-colors"
+                                                                                                            title="Download as PDF"
+                                                                                                        >
+                                                                                                            <ArrowDownTrayIcon className="w-4 h-4" />
+                                                                                                        </button>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                {content.body && (
+                                                                                                    <div className="relative">
+                                                                                                        <div
+                                                                                                            className={`text-sm font-medium text-gray-500 mt-2 leading-relaxed prose prose-slate prose-sm max-w-none overflow-hidden transition-all duration-300 ${(!expandedBlocks[content.id] && content.body.length > 500) ? 'max-h-[200px]' : 'max-h-full'}`}
+                                                                                                            dangerouslySetInnerHTML={{ __html: content.body }}
+                                                                                                            style={{
+                                                                                                                maskImage: (!expandedBlocks[content.id] && content.body.length > 500) ? 'linear-gradient(to bottom, black 70%, transparent 100%)' : 'none',
+                                                                                                                WebkitMaskImage: (!expandedBlocks[content.id] && content.body.length > 500) ? 'linear-gradient(to bottom, black 70%, transparent 100%)' : 'none'
+                                                                                                            }}
+                                                                                                        />
+                                                                                                        {content.body.length > 500 && (
+                                                                                                            <button
+                                                                                                                onClick={(e) => { e.stopPropagation(); setExpandedBlocks(prev => ({ ...prev, [content.id]: !prev[content.id] })); }}
+                                                                                                                className="mt-2 text-[10px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 block"
+                                                                                                            >
+                                                                                                                {expandedBlocks[content.id] ? 'Show Less' : 'Read More content...'}
+                                                                                                            </button>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))
+                                                                                ) : (
+                                                                                    <div className="py-8 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-100">
+                                                                                        <i className="fas fa-folder-open text-gray-300 mb-2 block"></i>
+                                                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No extra study materials added by teacher yet</p>
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {/* Quizzes fall under Learning Materials */}
+                                                                                {lesson.quizzes?.length > 0 && (
+                                                                                    <div className="bg-amber-50/30 rounded-2xl border border-amber-100 p-6 space-y-4">
+                                                                                        <div className="flex items-center space-x-2 text-[10px] font-black text-amber-600 uppercase tracking-widest">
+                                                                                            <i className="fas fa-poll" />
+                                                                                            <span>Lesson Quizzes</span>
+                                                                                        </div>
+                                                                                        {lesson.quizzes.map((quiz) => (
+                                                                                            <div key={quiz.id} className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm">
+                                                                                                <div>
+                                                                                                    <p className="font-bold text-gray-900">{quiz.title}</p>
+                                                                                                    <p className="text-[10px] font-black text-gray-400 uppercase mt-1">
+                                                                                                        {quiz.questions.length} Items · {quiz.time_limit_minutes} Mins · Attempts: {(course.quiz_submissions || []).filter(s => s.quiz === quiz.id).length}/{quiz.max_attempts || 1}
+                                                                                                    </p>
+                                                                                                </div>
+                                                                                                <button
+                                                                                                    onClick={() => setTakingQuiz(quiz)}
+                                                                                                    className="px-6 py-2.5 bg-amber-500 text-white text-xs font-black rounded-xl hover:bg-amber-600 shadow-lg shadow-amber-500/20 transition-all uppercase tracking-widest"
+                                                                                                >
+                                                                                                    Start
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Tab Content: Requirements (Learning Outcomes) */}
+                                                                        {lessonActiveTab[lesson.id] === 'requirements' && (
+                                                                            <div className="space-y-4 animate-in fade-in duration-300">
+                                                                                {lesson.learning_outcomes?.map((outcome) => (
+                                                                                    <div
+                                                                                        key={outcome.id}
+                                                                                        className="flex items-start bg-slate-50/50 border border-slate-100 rounded-2xl p-5 hover:border-slate-200 transition-all"
+                                                                                    >
+                                                                                        <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center mr-4 flex-shrink-0 border border-slate-100 shadow-sm text-[10px] font-black text-[#18216D]">
+                                                                                            <i className="fas fa-bullseye opacity-40"></i>
+                                                                                        </div>
+                                                                                        <div className="flex-1 min-w-0">
+                                                                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">{outcome.title}</p>
+                                                                                            <p className="text-sm font-medium text-slate-600 leading-relaxed">{outcome.body}</p>
+                                                                                        </div>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>

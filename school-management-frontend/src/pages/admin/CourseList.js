@@ -53,6 +53,8 @@ const CourseList = () => {
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     const { fetchLearningAreas, invalidateCache } = useCachedLearningAreas(get);
 
@@ -169,6 +171,18 @@ const CourseList = () => {
         });
     }, [courses, searchTerm, filterStatus, filterGrade]);
 
+    // Reset pagination when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterStatus, filterGrade]);
+
+    const paginatedCourses = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredCourses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredCourses, currentPage]);
+
+    const totalPages = Math.ceil(filteredCourses.length / ITEMS_PER_PAGE);
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -265,7 +279,7 @@ const CourseList = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {filteredCourses.map((course) => (
+                                {paginatedCourses.map((course) => (
                                     <tr key={course.id} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div>
@@ -319,9 +333,46 @@ const CourseList = () => {
                 )}
             </div>
 
-            {/* Summary */}
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                Displaying {filteredCourses.length} Learning Areas
+            {/* Pagination & Summary */}
+            <div className="flex items-center justify-between">
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Showing {Math.min(filteredCourses.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)} - {Math.min(filteredCourses.length, currentPage * ITEMS_PER_PAGE)} of {filteredCourses.length} Learning Areas
+                </div>
+
+                {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 transition-all disabled:opacity-30 disabled:hover:text-gray-400"
+                        >
+                            <i className="fas fa-chevron-left text-xs"></i>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button
+                                    key={i + 1}
+                                    onClick={() => setCurrentPage(i + 1)}
+                                    className={`w-10 h-10 rounded-xl text-[10px] font-black transition-all ${currentPage === i + 1
+                                        ? 'bg-[#18216D] text-white shadow-lg shadow-indigo-900/20'
+                                        : 'bg-white border border-gray-100 text-gray-400 hover:bg-slate-50'
+                                        }`}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 transition-all disabled:opacity-30 disabled:hover:text-gray-400"
+                        >
+                            <i className="fas fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Edit Modal - WITH SCROLLING */}

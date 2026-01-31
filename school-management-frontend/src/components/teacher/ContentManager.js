@@ -13,7 +13,7 @@ import {
     XMarkIcon
 } from '@heroicons/react/24/outline';
 
-const ContentManager = ({ lesson, onClose }) => {
+const ContentManager = ({ lesson, onClose, onSave }) => {
     const { post, put } = useApi();
     const { showToast } = useAppState();
     const [contentBlocks, setContentBlocks] = useState(lesson.contents || []);
@@ -129,6 +129,7 @@ const ContentManager = ({ lesson, onClose }) => {
             }
 
             showToast('Content saved successfully!');
+            if (onSave) onSave();
             onClose();
         } catch (error) {
             console.error('Error saving content:', error);

@@ -37,6 +37,7 @@ const GradeBook = ({ courseId }) => {
     const handleSaveGrade = async (studentId, assignmentId) => {
         const student = gradebook.students.find(s => s.student_id === studentId);
         const gradeData = student?.grades[assignmentId];
+        const assignment = gradebook.assignments.find(a => a.id === assignmentId);
 
         const score = parseFloat(editValue);
         if (isNaN(score) || score < 0) {
@@ -49,7 +50,7 @@ const GradeBook = ({ courseId }) => {
                 // Update existing grade
                 await put(`/courses/api/grades/${gradeData.grade_id}/`, {
                     score: score,
-                    letter_grade: calculateLetterGrade(score)
+                    competency_level: calculateLevel(score, assignment.total_marks)
                 });
             } else {
                 // Create new grade
@@ -57,7 +58,7 @@ const GradeBook = ({ courseId }) => {
                     student: studentId,
                     assignment: assignmentId,
                     score: score,
-                    letter_grade: calculateLetterGrade(score)
+                    competency_level: calculateLevel(score, assignment.total_marks)
                 });
             }
 
@@ -219,8 +220,8 @@ const GradeBook = ({ courseId }) => {
                                                                 <span className="text-sm font-black text-[#18216D]">
                                                                     {gradeData.score}
                                                                 </span>
-                                                                <span className="text-[10px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">
-                                                                    {gradeData.letter_grade}
+                                                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border ${getLevelData(gradeData.competency_level || calculateLevel(gradeData.score, assignment.total_marks)).bg} ${getLevelData(gradeData.competency_level || calculateLevel(gradeData.score, assignment.total_marks)).color}`}>
+                                                                    {gradeData.competency_level || calculateLevel(gradeData.score, assignment.total_marks)}
                                                                 </span>
                                                             </>
                                                         ) : (

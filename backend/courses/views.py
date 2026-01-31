@@ -704,18 +704,32 @@ def course_detail_api(request, pk):
                 
                 for sub in strand.sub_strands.all().order_by('order'):
                     total_lessons += 1
+                    
+                    # Try to find a real Lesson object matching this sub-strand
+                    real_lesson = Lesson.objects.filter(
+                        module__learning_area=area,
+                        title=sub.name
+                    ).first()
+                    
+                    from teachers.lesson_serializers import LessonContentSerializer
+                    teacher_contents = []
+                    if real_lesson:
+                        teacher_contents = LessonContentSerializer(real_lesson.contents.all(), many=True).data
+
                     lesson = {
                         'id': sub.id,
                         'title': sub.name,
                         'summary': sub.description,
                         'order': sub.order,
-                        'duration_minutes': 40, # Default CBC period
-                        'contents': [
+                        'teacher_contents': teacher_contents,
+                        'content_count': len(teacher_contents),
+                        'outcomes_count': sub.learning_outcomes.count(),
+                        'learning_outcomes': [
                             {
                                 'id': outcome.id,
                                 'title': outcome.code,
                                 'body': outcome.description,
-                                'content_type': 'document'
+                                'content_type': 'outcome'
                             }
                             for outcome in sub.learning_outcomes.all().order_by('order')
                         ],

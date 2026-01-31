@@ -41,6 +41,7 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
         criteria_me: assignment?.criteria_me || '',
         criteria_ae: assignment?.criteria_ae || '',
         criteria_be: assignment?.criteria_be || '',
+        is_manual: assignment?.submission_types?.length === 0 || assignment?.is_manual || false,
     });
 
     // Fetch current learning area and its strands
@@ -114,6 +115,8 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
                 learning_outcome: selectedOutcomes[0]?.id, // Fallback for legacy
                 tested_outcomes: selectedOutcomes.map(o => o.id),
                 assessment_type: formData.assessment_type,
+                submission_types: formData.is_manual ? [] : formData.submission_types,
+                is_manual: formData.is_manual,
             };
 
             if (isEditMode) {
@@ -258,6 +261,24 @@ const AssignmentCreator = ({ courseId, assignment, onClose, onSave }) => {
                                     <p className="text-[10px] font-bold opacity-70 mt-1">End of Strand</p>
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Manual Toggle */}
+                        <div className="space-y-4">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Submission Mode</label>
+                            <button
+                                type="button"
+                                onClick={() => setFormData(p => ({ ...p, is_manual: !p.is_manual }))}
+                                className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${formData.is_manual ? 'border-amber-500 bg-amber-50/50' : 'border-slate-50 bg-slate-50'}`}
+                            >
+                                <div className="text-left">
+                                    <p className={`font-black text-xs uppercase ${formData.is_manual ? 'text-amber-600' : 'text-slate-400'}`}>Manual Assignment</p>
+                                    <p className="text-[10px] font-bold text-slate-400 opacity-70">No digital submission required (Physical work/Oral)</p>
+                                </div>
+                                <div className={`w-12 h-6 rounded-full p-1 transition-all ${formData.is_manual ? 'bg-amber-500' : 'bg-slate-200'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full transition-all transform ${formData.is_manual ? 'translate-x-6' : 'translate-x-0'}`} />
+                                </div>
+                            </button>
                         </div>
 
                         {/* Due Date */}

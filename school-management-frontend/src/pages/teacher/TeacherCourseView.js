@@ -14,16 +14,14 @@ import {
     ClipboardDocumentCheckIcon,
     QuestionMarkCircleIcon,
     UsersIcon,
-    ChatBubbleLeftRightIcon,
     Squares2X2Icon,
     ListBulletIcon,
     ChevronDownIcon
 } from '@heroicons/react/24/outline';
-import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/24/solid';
 import QuizBuilder from '../../components/teacher/QuizBuilder';
 import GradeBook from '../../components/teacher/GradeBook';
-import DiscussionManager from '../../components/teacher/DiscussionManager';
 import Modal from '../../components/common/Modal';
+import AttendanceRegistry from '../../components/teacher/AttendanceRegistry';
 import { useAppState } from '../../context/AppStateContext';
 
 const SidebarItem = ({ id, label, icon: Icon, active, collapsed, onClick }) => (
@@ -54,9 +52,9 @@ const Sidebar = ({ activeTab, onChange, collapsed }) => {
         { id: 'content', label: 'Curriculum Strands', icon: BookOpenIcon },
         { id: 'assignments', label: 'Assignments', icon: ClipboardDocumentCheckIcon },
         { id: 'quizzes', label: 'Quizzes', icon: QuestionMarkCircleIcon },
+        { id: 'attendance', label: 'Attendance', icon: ClipboardDocumentCheckIcon },
         { id: 'gradebook', label: 'Competency Grades', icon: ChartBarIcon },
         { id: 'students', label: 'Students', icon: UsersIcon },
-        { id: 'discussions', label: 'Discussions', icon: ChatBubbleLeftRightIcon },
     ];
 
     return (
@@ -102,11 +100,20 @@ const TeacherCourseView = () => {
     const [quizzes, setQuizzes] = useState([]);
     const [showQuizBuilder, setShowQuizBuilder] = useState(false);
     const [editingQuiz, setEditingQuiz] = useState(null);
-    const [showDiscussionManager, setShowDiscussionManager] = useState(false);
     const [selectedLessonForQuiz, setSelectedLessonForQuiz] = useState(null);
     const [quizToDelete, setQuizToDelete] = useState(null);
     const [quizViewMode, setQuizViewMode] = useState('grid');
     const { showToast } = useAppState();
+
+    useEffect(() => {
+        const handleTabChange = (e) => {
+            if (e.detail) {
+                setActiveTab(e.detail);
+            }
+        };
+        window.addEventListener('change-course-tab', handleTabChange);
+        return () => window.removeEventListener('change-course-tab', handleTabChange);
+    }, []);
 
     const fetchCourseData = useCallback(async () => {
         try {
@@ -195,10 +202,7 @@ const TeacherCourseView = () => {
         <div className="flex h-screen bg-gray-50 overflow-hidden">
             <Sidebar
                 activeTab={activeTab}
-                onChange={(tab) => {
-                    setActiveTab(tab);
-                    if (tab === 'discussions') setShowDiscussionManager(true);
-                }}
+                onChange={(tab) => setActiveTab(tab)}
                 collapsed={isSidebarCollapsed}
             />
 
@@ -536,6 +540,10 @@ const TeacherCourseView = () => {
                         {activeTab === 'gradebook' && (
                             <GradeBook courseId={id} />
                         )}
+
+                        {activeTab === 'attendance' && (
+                            <AttendanceRegistry courseId={id} students={course.enrolled_students} />
+                        )}
                     </div>
                 </main>
             </div>
@@ -554,15 +562,6 @@ const TeacherCourseView = () => {
                 />
             )}
 
-            {showDiscussionManager && (
-                <DiscussionManager
-                    courseId={id}
-                    onClose={() => {
-                        setShowDiscussionManager(false);
-                        setActiveTab('content');
-                    }}
-                />
-            )}
 
             {/* Deletion Modal */}
             <Modal

@@ -6,6 +6,10 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Open Sans"', 'sans-serif'],
+        display: ['Montserrat', 'sans-serif'],
+      },
       colors: {
         primary: '#1e40af',
         secondary: '#475569',
